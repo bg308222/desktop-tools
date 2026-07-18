@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractRuleIds } from '../renderer/lib/mention'
+import { extractRuleIds } from '../shared/mention'
 
 describe('extractRuleIds', () => {
   it('null / 無效 JSON → []', () => {
