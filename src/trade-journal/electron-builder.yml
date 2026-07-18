@@ -1,0 +1,20 @@
+appId: com.desktop-tools.trade-journal
+productName: 交易復盤
+directories:
+  output: release
+files:
+  - dist/**
+  - dist-electron/**
+# sql.js 於執行時 require，且需讀取 .wasm 檔 → 解壓出 asar
+asarUnpack:
+  - '**/node_modules/sql.js/**'
+linux:
+  target:
+    - AppImage
+  category: Office
+win:
+  target:
+    - nsis
+mac:
+  target:
+    - dmg
