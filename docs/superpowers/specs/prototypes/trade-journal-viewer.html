@@ -1,0 +1,966 @@
+<title>交易復盤 Viewer 原型</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --panel: #ffffff; --panel-2: #eef2f7; --border: #d4dce6;
+    --text: #131820; --muted: #5b6b7f; --faint: #8595a8;
+    --accent: #0d9488; --accent-soft: #0d94881a;
+    --win: #1a7f37; --loss: #cf222e; --tie: #9a6700;
+    --grid: #e3e9f1; --up: #1a7f37; --down: #cf222e; --candle-wick: #7c8ba0;
+    --shadow: 0 1px 3px rgba(20,30,50,.08), 0 8px 24px rgba(20,30,50,.06);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1116; --panel: #161b22; --panel-2: #1c2230; --border: #263041;
+      --text: #e6edf3; --muted: #8b98a9; --faint: #63718a;
+      --accent: #2dd4bf; --accent-soft: #2dd4bf1f;
+      --win: #3fb950; --loss: #f85149; --tie: #d29922;
+      --grid: #1e2735; --up: #3fb950; --down: #f85149; --candle-wick: #55637a;
+      --shadow: 0 1px 3px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f7fa; --panel: #ffffff; --panel-2: #eef2f7; --border: #d4dce6;
+    --text: #131820; --muted: #5b6b7f; --faint: #8595a8;
+    --accent: #0d9488; --accent-soft: #0d94881a;
+    --win: #1a7f37; --loss: #cf222e; --tie: #9a6700;
+    --grid: #e3e9f1; --up: #1a7f37; --down: #cf222e; --candle-wick: #7c8ba0;
+    --shadow: 0 1px 3px rgba(20,30,50,.08), 0 8px 24px rgba(20,30,50,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1116; --panel: #161b22; --panel-2: #1c2230; --border: #263041;
+    --text: #e6edf3; --muted: #8b98a9; --faint: #63718a;
+    --accent: #2dd4bf; --accent-soft: #2dd4bf1f;
+    --win: #3fb950; --loss: #f85149; --tie: #d29922;
+    --grid: #1e2735; --up: #3fb950; --down: #f85149; --candle-wick: #55637a;
+    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .app { display: grid; grid-template-columns: 180px 1fr; height: 100vh; min-height: 0; }
+
+  /* Sidebar */
+  .sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: .2px; padding: 6px 10px 14px; display: flex; align-items: center; gap: 8px; }
+  .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .navitem { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--muted); cursor: pointer; font-weight: 500; user-select: none; }
+  .navitem:hover { background: var(--panel-2); color: var(--text); }
+  .navitem.active { background: var(--accent-soft); color: var(--accent); }
+  .navitem .ico { width: 16px; text-align: center; opacity: .9; }
+  .sidebar .spacer { flex: 1; }
+  .themebtn { margin-top: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 8px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+  .themebtn:hover { color: var(--text); }
+
+  /* Main */
+  .main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--panel); }
+
+  .axis { display: flex; align-items: center; gap: 10px; }
+  .axis.right { justify-content: flex-end; }
+  .kcap { font-family: var(--mono); font-size: 10px; color: var(--faint); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; letter-spacing: .5px; background: var(--panel-2); }
+  .axis .label-sm { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .8px; }
+
+  .marketcol { display: flex; align-items: center; gap: 10px; }
+  .arrowscol { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+  .marketstack { display: flex; flex-direction: column; gap: 1px; line-height: 1.25; }
+  .mkt { font-family: var(--sans); transition: color .12s, opacity .12s; }
+  .mkt.prev, .mkt.next { font-size: 12px; color: var(--faint); }
+  .mkt.cur { font-size: 17px; font-weight: 700; color: var(--text); }
+  .mkt.hide { opacity: 0; }
+  .datecenter { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .daterow { display: flex; align-items: center; gap: 14px; }
+  .dateitem { display: flex; flex-direction: column; align-items: center; gap: 1px; transition: color .12s, opacity .12s; min-width: 46px; }
+  .dateitem .dd { font-family: var(--mono); letter-spacing: .5px; }
+  .dateitem .ww { font-size: 10px; color: var(--faint); }
+  .dateitem.prev, .dateitem.next { opacity: .8; }
+  .dateitem.prev .dd, .dateitem.next .dd { font-size: 14px; color: var(--muted); }
+  .dateitem.cur .dd { font-size: 22px; font-weight: 650; color: var(--text); }
+  .dateitem.cur .ww { font-size: 11px; color: var(--muted); }
+  .dateitem.hide { opacity: 0; }
+  .weekwrap { display: flex; align-items: center; gap: 6px; }
+  .weekstep { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); cursor: pointer; font-size: 13px; user-select: none; }
+  .weekstep:hover { color: var(--text); border-color: var(--faint); }
+  .weekselect { font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 4px 26px 4px 12px; cursor: pointer; appearance: none; background-image: linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%); background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+  .weekselect:hover { border-color: var(--faint); }
+  .status-eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--faint); margin-bottom: 4px; text-align: right; }
+
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+  .badge .b-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.reviewed { color: var(--win); background: color-mix(in srgb, var(--win) 12%, transparent); border-color: color-mix(in srgb, var(--win) 30%, transparent); }
+  .badge.reviewed .b-dot { background: var(--win); }
+  .badge.recorded { color: var(--tie); background: color-mix(in srgb, var(--tie) 12%, transparent); border-color: color-mix(in srgb, var(--tie) 30%, transparent); }
+  .badge.recorded .b-dot { background: var(--tie); }
+
+  /* Stage */
+  .stage { flex: 1; min-height: 0; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modebar { display: flex; align-items: center; gap: 8px; }
+  .modebtn { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; }
+  .modebtn:hover { color: var(--text); border-color: var(--faint); }
+  .modebtn.active { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent); }
+  .modebtn .num { font-family: var(--mono); font-size: 11px; border: 1px solid currentColor; border-radius: 4px; width: 16px; height: 16px; display: grid; place-items: center; opacity: .8; }
+  .modebar .flex { flex: 1; }
+  .kindpills { display: flex; gap: 6px; }
+  .kindpill { font-size: 12px; padding: 5px 11px; border-radius: 7px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); cursor: pointer; }
+  .kindpill.active { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+
+  .canvaswrap { flex: 1; min-height: 0; display: grid; gap: 12px; }
+  .canvaswrap.single { grid-template-columns: 1fr; }
+  .canvaswrap.double { grid-template-columns: 1fr 1fr; }
+  .frame { position: relative; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; min-height: 0; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+  .frame .cap { position: absolute; top: 10px; left: 12px; z-index: 3; font-size: 11px; font-weight: 600; letter-spacing: .3px; color: var(--muted); background: color-mix(in srgb, var(--panel) 80%, transparent); backdrop-filter: blur(4px); padding: 3px 9px; border-radius: 6px; border: 1px solid var(--border); }
+  .frame canvas { width: 100%; height: 100%; display: block; }
+  .placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--faint); text-align: center; padding: 20px; }
+  .placeholder .icon { font-size: 28px; opacity: .5; }
+  .placeholder .paste { font-family: var(--mono); font-size: 11px; border: 1px dashed var(--border); border-radius: 6px; padding: 4px 8px; color: var(--muted); }
+
+  /* Meta strip */
+  .metastrip { display: grid; grid-template-columns: auto auto 1fr; gap: 18px; align-items: center; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
+  .wltgroup { display: flex; flex-direction: column; gap: 5px; }
+  .wltgroup .h { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--faint); }
+  .wltrow { display: flex; gap: 6px; font-family: var(--mono); }
+  .wlt { display: flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 7px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--panel-2); }
+  .wlt .k { font-size: 10px; opacity: .8; font-weight: 700; }
+  .wlt.w { color: var(--win); } .wlt.l { color: var(--loss); } .wlt.t { color: var(--tie); }
+  .divider-v { width: 1px; align-self: stretch; background: var(--border); }
+  .rightmeta { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+  .note { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .rulechip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 1px 7px; border-radius: 5px; background: color-mix(in srgb, var(--tie) 14%, transparent); color: var(--tie); border: 1px solid color-mix(in srgb, var(--tie) 30%, transparent); font-weight: 500; }
+  .rulechip::before { content: "§"; opacity: .7; }
+
+  /* Legend */
+  .legend { display: flex; align-items: center; gap: 6px 16px; flex-wrap: wrap; padding: 10px 20px; border-top: 1px solid var(--border); background: var(--panel); color: var(--muted); font-size: 12px; }
+  .key { display: inline-flex; align-items: center; gap: 6px; }
+  kbd { font-family: var(--mono); font-size: 11px; min-width: 20px; height: 20px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; background: var(--panel-2); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; color: var(--text); }
+  .legend .sep { color: var(--border); }
+  .hint-note { margin-left: auto; font-size: 11px; color: var(--faint); }
+
+  .flash { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(8px); background: var(--text); color: var(--bg); font-size: 12.5px; font-weight: 500; padding: 8px 16px; border-radius: 999px; opacity: 0; transition: opacity .18s, transform .18s; pointer-events: none; box-shadow: var(--shadow); z-index: 50; }
+  .flash.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* views */
+  .view { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .view[hidden] { display: none; }
+
+  /* record view */
+  .calwrap { position: relative; }
+  .calbtn { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 12px; cursor: pointer; }
+  .calbtn:hover { border-color: var(--faint); }
+  .calpop { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 40; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 12px; width: 268px; }
+  .calpop[hidden] { display: none; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cal-title { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .cal-nav { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); cursor: pointer; }
+  .cal-nav:hover { color: var(--text); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+  .cal-dow { text-align: center; font-size: 10px; color: var(--faint); padding: 3px 0; }
+  .cal-cell { position: relative; aspect-ratio: 1; display: grid; place-items: center; font-family: var(--mono); font-size: 12px; border-radius: 7px; cursor: pointer; color: var(--text); }
+  .cal-cell.empty { visibility: hidden; }
+  .cal-cell:hover { background: var(--panel-2); }
+  .cal-cell.sel { background: var(--accent); color: var(--bg); font-weight: 700; }
+  .cal-cell .hasdot { position: absolute; bottom: 4px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+  .cal-cell.sel .hasdot { background: var(--bg); }
+  .rec-body { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px 48px; display: flex; flex-direction: column; gap: 16px; width: 100%; max-width: 940px; margin: 0 auto; }
+  .rec-block { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+  .rec-block-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 650; font-size: 14px; background: var(--panel-2); }
+  .phase-num { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--bg); display: grid; place-items: center; font-family: var(--mono); font-size: 12px; font-weight: 700; }
+  .phase-hint { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--faint); }
+  .rec-block-body { padding: 16px; display: flex; flex-direction: column; gap: 18px; }
+
+  .slot-row { display: grid; gap: 14px; }
+  .slot-row.solo { grid-template-columns: minmax(0,380px); }
+  .slot-row.pair { grid-template-columns: 1fr 1fr; }
+  .imgslot { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel-2); display: flex; flex-direction: column; }
+  .imgslot .slot-cap { display: flex; align-items: center; justify-content: space-between; padding: 7px 11px; font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .imgslot .slot-cap .replace { font-size: 11px; font-weight: 400; color: var(--accent); cursor: pointer; opacity: 0; transition: opacity .12s; }
+  .imgslot:hover .slot-cap .replace { opacity: 1; }
+  .slot-canvas { aspect-ratio: 16/10; position: relative; }
+  .slot-canvas canvas { width: 100%; height: 100%; display: block; }
+  .pastezone { aspect-ratio: 16/10; margin: 10px; border: 2px dashed var(--border); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--faint); cursor: pointer; text-align: center; padding: 12px; }
+  .pastezone:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .pastezone .pz-ico { font-size: 26px; opacity: .55; }
+  .pastezone .pz-main { font-size: 12.5px; font-weight: 500; }
+  .pastezone .pz-sub { font-family: var(--mono); font-size: 10.5px; }
+
+  .wlt-edit { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .wlt-edit .lbl, .field .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--faint); min-width: 70px; }
+  .steppers { display: flex; gap: 10px; }
+  .stepper { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
+  .stepper .sk { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 0 8px; }
+  .stepper.w .sk { color: var(--win); } .stepper.l .sk { color: var(--loss); } .stepper.t .sk { color: var(--tie); }
+  .stepper button { border: 0; background: var(--panel-2); color: var(--muted); width: 26px; height: 30px; cursor: pointer; font-size: 15px; font-family: var(--sans); }
+  .stepper button:hover { color: var(--text); background: var(--border); }
+  .stepper .val { font-family: var(--mono); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; }
+  .ideal-hint { font-size: 11.5px; color: var(--faint); }
+
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .notebox { min-height: 88px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-2); padding: 11px 13px; font-size: 13px; line-height: 1.9; color: var(--text); outline: none; }
+  .notebox:focus { border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .notebox:empty::before { content: "寫下這筆交易的想法…（打 @ 引用規則）"; color: var(--faint); }
+  .notebox .rulechip { margin: 0 1px; }
+  .mention-pop { position: fixed; z-index: 60; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 5px; width: 240px; max-height: 240px; overflow-y: auto; }
+  .mention-pop[hidden] { display: none; }
+  .mention-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border-radius: 7px; cursor: pointer; }
+  .mention-item.active, .mention-item:hover { background: var(--accent-soft); }
+  .mention-item .mi-name { font-size: 13px; color: var(--text); }
+  .mention-item .mi-grp { font-size: 10.5px; color: var(--faint); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+  .mention-empty { padding: 8px 10px; font-size: 12px; color: var(--faint); }
+  .note-help { font-size: 11px; color: var(--faint); }
+  .mono-inline { font-family: var(--mono); background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  .tags .tag.add { background: transparent; border: 1px dashed var(--border); color: var(--muted); cursor: pointer; }
+  .tags .tag.add:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* stub view */
+  .view.stub { align-items: center; justify-content: center; }
+  .stub-inner { text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 8px; }
+  .stub-ico { font-size: 40px; opacity: .5; }
+  .stub-name { font-size: 18px; font-weight: 650; color: var(--text); }
+  .stub-sub { font-size: 12.5px; color: var(--faint); }
+
+  @media (max-width: 640px) { .slot-row.pair { grid-template-columns: 1fr; } }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 720px) { .app { grid-template-columns: 1fr; } .sidebar { display: none; } .canvaswrap.double { grid-template-columns: 1fr; } }
+</style>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> 交易復盤</div>
+    <div class="navitem active" data-view="record">📝 <span>記錄</span></div>
+    <div class="navitem" data-view="viewer">🔍 <span>復盤</span></div>
+    <div class="navitem" data-view="tag">🏷 <span>標籤</span></div>
+    <div class="navitem" data-view="rules">📐 <span>交易規則</span></div>
+    <div class="spacer"></div>
+    <div class="navitem" data-view="settings">⚙ <span>設定</span></div>
+    <button class="themebtn" id="themeBtn">◐ 切換亮/暗</button>
+  </aside>
+
+  <main class="main">
+   <div class="view" id="viewViewer" hidden>
+    <div class="topbar">
+      <div class="axis">
+        <div class="marketcol">
+          <div class="arrowscol">
+            <span class="kcap">↑</span>
+            <span class="kcap">↓</span>
+          </div>
+          <div class="marketstack">
+            <span class="mkt prev" id="mktPrev">—</span>
+            <span class="mkt cur" id="mktCur">—</span>
+            <span class="mkt next" id="mktNext">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="datecenter">
+        <div class="daterow">
+          <span class="kcap">←</span>
+          <div class="dateitem prev"><span class="dd" id="datePrevD">—</span><span class="ww" id="datePrevW"></span></div>
+          <div class="dateitem cur"><span class="dd" id="dateCurD">—</span><span class="ww" id="dateCurW"></span></div>
+          <div class="dateitem next"><span class="dd" id="dateNextD">—</span><span class="ww" id="dateNextW"></span></div>
+          <span class="kcap">→</span>
+        </div>
+        <div class="weekwrap">
+          <span class="weekstep" id="weekPrev">‹</span>
+          <select class="weekselect" id="weekSel"></select>
+          <span class="weekstep" id="weekNext">›</span>
+        </div>
+      </div>
+
+      <div class="axis right">
+        <div>
+          <div class="status-eyebrow">狀態</div>
+          <span id="badge" class="badge reviewed"><span class="b-dot"></span>已復盤</span>
+        </div>
+      </div>
+    </div>
+
+    <section class="stage">
+      <div class="modebar">
+        <button class="modebtn active" data-mode="1"><span class="num">1</span>單圖</button>
+        <button class="modebtn" data-mode="2"><span class="num">2</span>原圖 + 復盤圖</button>
+        <button class="modebtn" data-mode="3"><span class="num">3</span>復盤圖 + 交易圖</button>
+        <div class="flex"></div>
+        <div class="kindpills" id="kindPills">
+          <span class="kindpill active" data-kind="trade">交易圖</span>
+          <span class="kindpill" data-kind="raw">原圖</span>
+          <span class="kindpill" data-kind="review">復盤圖</span>
+        </div>
+      </div>
+
+      <div class="canvaswrap single" id="canvasWrap">
+        <div class="frame" id="frameA">
+          <span class="cap" id="capA">交易圖</span>
+          <canvas id="canvasA"></canvas>
+        </div>
+        <div class="frame" id="frameB" style="display:none">
+          <span class="cap" id="capB">復盤圖</span>
+          <canvas id="canvasB"></canvas>
+        </div>
+      </div>
+
+      <div class="metastrip">
+        <div class="wltgroup">
+          <span class="h">實際 WLT</span>
+          <div class="wltrow" id="actualWlt"></div>
+        </div>
+        <div class="divider-v"></div>
+        <div class="wltgroup">
+          <span class="h">理想 WLT</span>
+          <div class="wltrow" id="idealWlt"></div>
+        </div>
+        <div class="divider-v"></div>
+        <div class="rightmeta">
+          <div class="tags" id="tags"></div>
+          <div class="note" id="note"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="legend">
+      <span class="key"><kbd>←</kbd><kbd>→</kbd> 換日期</span>
+      <span class="sep">·</span>
+      <span class="key"><kbd>↑</kbd><kbd>↓</kbd> 換市場</span>
+      <span class="sep">·</span>
+      <span class="key"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 切模式</span>
+      <span class="sep">·</span>
+      <span class="key"><kbd>Space</kbd> 單圖循環三圖</span>
+      <span class="hint-note">限縮在當週 · 到底自動循環回開頭</span>
+    </div>
+   </div><!-- /viewViewer -->
+
+   <div class="view" id="viewRecord" hidden>
+    <div class="topbar">
+      <div class="axis">
+        <div class="marketcol">
+          <div class="arrowscol"><span class="kcap">↑</span><span class="kcap">↓</span></div>
+          <div class="marketstack">
+            <span class="mkt prev" id="recMktPrev">—</span>
+            <span class="mkt cur" id="recMktCur">—</span>
+            <span class="mkt next" id="recMktNext">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="datecenter">
+        <div class="daterow">
+          <span class="kcap">←</span>
+          <div class="dateitem prev"><span class="dd" id="recDatePrevD">—</span><span class="ww" id="recDatePrevW"></span></div>
+          <div class="dateitem cur"><span class="dd" id="recDateCurD">—</span><span class="ww" id="recDateCurW"></span></div>
+          <div class="dateitem next"><span class="dd" id="recDateNextD">—</span><span class="ww" id="recDateNextW"></span></div>
+          <span class="kcap">→</span>
+        </div>
+        <div class="calwrap">
+          <button class="calbtn" id="calBtn">📅 <span id="calBtnLabel">選日期</span></button>
+          <div class="calpop" id="calPop" hidden></div>
+        </div>
+      </div>
+
+      <div class="axis right">
+        <div>
+          <div class="status-eyebrow">狀態</div>
+          <span id="recBadge" class="badge"></span>
+        </div>
+      </div>
+    </div>
+    <div class="rec-body">
+      <section class="rec-block">
+        <div class="rec-block-head">交易</div>
+        <div class="rec-block-body">
+          <div class="slot-row solo" id="slotTradeRow"></div>
+          <div class="wlt-edit"><span class="lbl">實際 WLT</span><div class="steppers" id="actualWltEdit"></div></div>
+        </div>
+      </section>
+
+      <section class="rec-block">
+        <div class="rec-block-head">復盤</div>
+        <div class="rec-block-body">
+          <div class="slot-row pair" id="slotReviewRow"></div>
+          <div class="wlt-edit"><span class="lbl">理想 WLT</span><div class="steppers" id="idealWltEdit"></div><span id="idealHint" class="ideal-hint"></span></div>
+        </div>
+      </section>
+
+      <section class="rec-block">
+        <div class="rec-block-head">其他</div>
+        <div class="rec-block-body">
+          <div class="field">
+            <span class="lbl">標籤</span>
+            <div class="tags" id="recTags"></div>
+          </div>
+          <div class="field">
+            <span class="lbl">備註</span>
+            <div class="notebox" id="recNote" contenteditable="true" spellcheck="false"></div>
+          </div>
+        </div>
+      </section>
+      <div class="mention-pop" id="mentionPop" hidden></div>
+    </div>
+    <div class="legend">
+      <span class="key"><kbd>←</kbd><kbd>→</kbd> 換日期</span>
+      <span class="sep">·</span>
+      <span class="key"><kbd>↑</kbd><kbd>↓</kbd> 換市場</span>
+      <span class="sep">·</span>
+      <span class="key">📅 點日期鈕開月曆跳日</span>
+      <span class="hint-note">操作與復盤頁一致</span>
+    </div>
+   </div><!-- /viewRecord -->
+
+   <div class="view stub" id="viewStub" hidden>
+     <div class="stub-inner"><div class="stub-ico" id="stubIco">🏷</div><div class="stub-name" id="stubName">標籤</div><div class="stub-sub">此區已在設計文件規劃，原型稍後補上互動。</div></div>
+   </div>
+  </main>
+</div>
+
+<div class="flash" id="flash"></div>
+
+<script>
+/* ---------- seeded RNG ---------- */
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ---------- fake dataset ---------- */
+const MARKETS = ["台指期","那斯達克","黃金","歐元美元"];
+const WEEK = ["日","一","二","三","四","五","六"];
+// 4 週假資料（週一～週五），示範週選擇器的縮放
+const DATES = [];
+const _start = new Date("2026-06-22T00:00:00");
+for(let w=0; w<4; w++) for(let d=0; d<5; d++){
+  const dt = new Date(_start); dt.setDate(_start.getDate()+w*7+d);
+  DATES.push(dt.toISOString().slice(0,10));
+}
+const fmtMD = s => { const p=s.slice(5).split("-"); return (+p[0])+"/"+(+p[1]); };
+const TAGPOOL = ["順勢","突破","假突破","區間","逆勢","情緒交易","完美執行","提前出場","分批進場"];
+const RULE_DEFS = [
+  {id:"r1", name:"只在區間邊緣進場", group:"行為白名單"},
+  {id:"r2", name:"等收盤確認再進", group:"行為白名單"},
+  {id:"r3", name:"獲利先出一半", group:"行為白名單"},
+  {id:"r4", name:"追高", group:"行為黑名單"},
+  {id:"r5", name:"逆勢加碼", group:"行為黑名單"},
+  {id:"r6", name:"提前出場", group:"待確認"},
+];
+const ruleName = id => (RULE_DEFS.find(r=>r.id===id)||{name:"已刪除規則"}).name;
+
+const entries = {}; // key -> entry
+function key(d,m){return d+"|"+m;}
+for(const d of DATES){
+  for(const m of MARKETS){
+    const r = mulberry32(hashStr(key(d,m)+"exist"));
+    if(r() < 0.18) continue; // some gaps to demonstrate skipping
+    const rr = mulberry32(hashStr(key(d,m)+"data"));
+    const reviewed = rr() < 0.62;
+    const aw=Math.floor(rr()*4), al=Math.floor(rr()*3), at=Math.floor(rr()*3);
+    const iw=aw+Math.floor(rr()*2), il=Math.max(0,al-Math.floor(rr()*2)), it=at;
+    const ntag=1+Math.floor(rr()*2);
+    const tags=[]; const pool=[...TAGPOOL];
+    for(let i=0;i<ntag;i++){ tags.push(pool.splice(Math.floor(rr()*pool.length),1)[0]); }
+    const ruleId = RULE_DEFS[Math.floor(rr()*RULE_DEFS.length)].id;
+    entries[key(d,m)] = {
+      actual:{w:aw||1,l:al,t:at}, ideal: reviewed?{w:iw||1,l:il,t:it}:null,
+      tags, ruleId,
+      images:{ trade:true, raw:reviewed, review:reviewed },
+      reviewed
+    };
+  }
+}
+// guarantee first cell exists
+if(!entries[key(DATES[0],MARKETS[0])]) entries[key(DATES[0],MARKETS[0])]={actual:{w:2,l:1,t:0},ideal:{w:3,l:0,t:0},tags:["順勢"],ruleId:"r1",images:{trade:true,raw:true,review:true},reviewed:true};
+
+const WEEKS = [];
+for(let i=0;i<DATES.length;i+=5){
+  const grp = DATES.slice(i,i+5);
+  WEEKS.push({ label: fmtMD(grp[0])+" – "+fmtMD(grp[grp.length-1]), dates: grp });
+}
+function weekDates(){ return WEEKS[curWeek].dates; }
+function datesForMarket(m){ return weekDates().filter(d=>entries[key(d,m)]); }
+function marketsForDate(d){ return MARKETS.filter(m=>entries[key(d,m)]); }
+
+/* ---------- state ---------- */
+let curWeek = 0;
+let curMarket = MARKETS.find(m=>datesForMarket(m).length) || MARKETS[0];
+let curDate = datesForMarket(curMarket)[0];
+let mode = 1;
+let singleKind = "trade";
+
+function selectWeek(i){
+  curWeek = i;
+  if(!datesForMarket(curMarket).length){
+    curMarket = MARKETS.find(m=>datesForMarket(m).length) || curMarket;
+  }
+  curDate = datesForMarket(curMarket)[0];
+  render();
+}
+const KIND_LABEL = {trade:"交易圖", raw:"原圖", review:"復盤圖"};
+
+/* ---------- chart drawing ---------- */
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function drawChart(canvas, k, kind){
+  const dpr = window.devicePixelRatio||1;
+  const rect = canvas.getBoundingClientRect();
+  const W = Math.max(2,Math.floor(rect.width)), H = Math.max(2,Math.floor(rect.height));
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  const ctx = canvas.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  const colUp=css('--up'), colDown=css('--down'), colGrid=css('--grid'),
+        colWick=css('--candle-wick'), colText=css('--muted'), colWin=css('--win'),
+        colLoss=css('--loss'), colAcc=css('--accent');
+
+  const padT=34,padB=22,padL=14,padR=52;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+
+  // grid
+  ctx.strokeStyle=colGrid; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=padT+plotH*i/4+.5;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();}
+
+  // candles
+  const rng=mulberry32(hashStr(k+"chart"));
+  const N=42; let price=100+rng()*10;
+  const candles=[]; let min=1e9,max=-1e9;
+  for(let i=0;i<N;i++){
+    const o=price; const drift=(rng()-0.48)*2.4; const c=o+drift;
+    const hi=Math.max(o,c)+rng()*1.4, lo=Math.min(o,c)-rng()*1.4;
+    candles.push({o,c,hi,lo}); price=c; min=Math.min(min,lo); max=Math.max(max,hi);
+  }
+  const range=(max-min)||1;
+  const y=v=>padT+plotH*(1-(v-min)/range);
+  const cw=plotW/N;
+  for(let i=0;i<N;i++){
+    const cd=candles[i]; const x=padL+cw*i+cw/2; const up=cd.c>=cd.o;
+    ctx.strokeStyle=colWick; ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,y(cd.hi));ctx.lineTo(x,y(cd.lo));ctx.stroke();
+    ctx.fillStyle=up?colUp:colDown;
+    const bw=Math.max(2,cw*0.6);
+    const yy=y(Math.max(cd.o,cd.c)); const hh=Math.max(1,Math.abs(y(cd.o)-y(cd.c)));
+    ctx.fillRect(x-bw/2,yy,bw,hh);
+  }
+  // price axis labels
+  ctx.fillStyle=colText; ctx.font='11px '+css('--mono'); ctx.textAlign='left';
+  for(let i=0;i<=4;i++){const v=max-range*i/4;ctx.fillText(v.toFixed(1),W-padR+8,padT+plotH*i/4+4);}
+
+  // kind-specific overlays
+  const entryIdx=Math.floor(N*0.45), exitIdx=Math.floor(N*0.78);
+  const ex=padL+cw*entryIdx+cw/2, ey=y(candles[entryIdx].c);
+  const xx=padL+cw*exitIdx+cw/2, xy=y(candles[exitIdx].c);
+
+  if(kind==="trade"){
+    const tp=candles[entryIdx].c+range*0.28, sl=candles[entryIdx].c-range*0.16;
+    ctx.setLineDash([5,4]); ctx.lineWidth=1.5;
+    ctx.strokeStyle=colWin; ctx.beginPath();ctx.moveTo(padL,y(tp));ctx.lineTo(W-padR,y(tp));ctx.stroke();
+    ctx.strokeStyle=colLoss; ctx.beginPath();ctx.moveTo(padL,y(sl));ctx.lineTo(W-padR,y(sl));ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=colWin; ctx.font='10px '+css('--mono'); ctx.textAlign='left';
+    ctx.fillText("TP",padL+2,y(tp)-4);
+    ctx.fillStyle=colLoss; ctx.fillText("SL",padL+2,y(sl)+12);
+    // entry / exit markers
+    ctx.fillStyle=colAcc; ctx.beginPath();ctx.arc(ex,ey,5,0,7);ctx.fill();
+    ctx.fillStyle=css('--bg'); ctx.font='9px '+css('--mono'); ctx.textAlign='center'; ctx.fillText("進",ex,ey+3);
+    ctx.fillStyle=colWin; ctx.beginPath();ctx.moveTo(xx,xy-6);ctx.lineTo(xx-6,xy+5);ctx.lineTo(xx+6,xy+5);ctx.closePath();ctx.fill();
+    ctx.textAlign='left';
+  } else if(kind==="review"){
+    // supply/demand zone + annotation arrow
+    const zTop=candles[entryIdx].c+range*0.1, zBot=candles[entryIdx].c-range*0.06;
+    ctx.fillStyle='color-mix(in srgb, '+colAcc+' 14%, transparent)';
+    ctx.fillRect(padL,y(zTop),plotW,y(zBot)-y(zTop));
+    ctx.strokeStyle=colAcc; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.strokeRect(padL,y(zTop),plotW,y(zBot)-y(zTop)); ctx.setLineDash([]);
+    ctx.fillStyle=colAcc; ctx.font='11px '+css('--sans'); ctx.textAlign='left';
+    ctx.fillText("需求區（應在此進場）",padL+6,y(zTop)-6);
+    // arrow
+    ctx.strokeStyle=colAcc; ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.moveTo(xx+30,xy-40);ctx.lineTo(xx+4,xy-8);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(xx+4,xy-8);ctx.lineTo(xx+12,xy-12);ctx.moveTo(xx+4,xy-8);ctx.lineTo(xx+10,xy-18);ctx.stroke();
+  }
+  // watermark kind
+  ctx.fillStyle=colText; ctx.globalAlpha=.0; ctx.globalAlpha=1;
+}
+
+/* ---------- render ---------- */
+const $=id=>document.getElementById(id);
+function flash(msg){const f=$("flash");f.textContent=msg;f.classList.add("show");clearTimeout(f._t);f._t=setTimeout(()=>f.classList.remove("show"),900);}
+
+function wltHTML(o){
+  if(!o) return '<span style="color:var(--faint);font-family:var(--mono);font-size:13px">尚未填寫</span>';
+  return `<span class="wlt w"><span class="k">W</span>${o.w}</span><span class="wlt l"><span class="k">L</span>${o.l}</span><span class="wlt t"><span class="k">T</span>${o.t}</span>`;
+}
+
+let weekSelBuilt = false;
+function renderWeekSelect(){
+  const sel = $("weekSel");
+  if(!weekSelBuilt){
+    sel.innerHTML = WEEKS.map((w,i)=>`<option value="${i}">第 ${i+1} 週 · ${w.label}</option>`).join("");
+    sel.addEventListener("change",()=>selectWeek(+sel.value));
+    weekSelBuilt = true;
+  }
+  sel.value = String(curWeek);
+}
+
+function dateLabel(d){ return { dd: fmtMD(d), ww: "週"+WEEK[new Date(d+"T00:00:00").getDay()] }; }
+function renderDateStack(){
+  const ds = datesForMarket(curMarket);
+  const i = ds.indexOf(curDate);
+  const single = ds.length <= 1;
+  const prev = ds[(i-1+ds.length)%ds.length];
+  const next = ds[(i+1)%ds.length];
+  const c = dateLabel(curDate);
+  $("dateCurD").textContent = c.dd; $("dateCurW").textContent = c.ww;
+  const p = dateLabel(prev), n = dateLabel(next);
+  $("datePrevD").textContent = single?"—":p.dd; $("datePrevW").textContent = single?"":p.ww;
+  $("dateNextD").textContent = single?"—":n.dd; $("dateNextW").textContent = single?"":n.ww;
+  document.querySelector(".dateitem.prev").classList.toggle("hide", single);
+  document.querySelector(".dateitem.next").classList.toggle("hide", single);
+}
+
+function renderMarketStack(){
+  const ms = marketsForDate(curDate);
+  const i = ms.indexOf(curMarket);
+  const prev = ms[(i-1+ms.length)%ms.length];
+  const next = ms[(i+1)%ms.length];
+  $("mktCur").textContent = curMarket;
+  const single = ms.length <= 1;
+  $("mktPrev").textContent = single ? "—" : prev;
+  $("mktNext").textContent = single ? "—" : next;
+  $("mktPrev").classList.toggle("hide", single);
+  $("mktNext").classList.toggle("hide", single);
+}
+
+function render(){
+  const e = entries[key(curDate,curMarket)];
+  renderWeekSelect();
+  renderMarketStack();
+  renderDateStack();
+
+  const badge=$("badge");
+  if(e.reviewed){badge.className="badge reviewed";badge.innerHTML='<span class="b-dot"></span>已復盤';}
+  else{badge.className="badge recorded";badge.innerHTML='<span class="b-dot"></span>已記錄（待復盤）';}
+
+  // mode buttons
+  document.querySelectorAll(".modebtn").forEach(b=>b.classList.toggle("active",+b.dataset.mode===mode));
+  $("kindPills").style.display = mode===1?"flex":"none";
+  document.querySelectorAll(".kindpill").forEach(p=>p.classList.toggle("active",p.dataset.kind===singleKind));
+
+  const wrap=$("canvasWrap"), fB=$("frameB");
+  let aKind,bKind=null;
+  if(mode===1){wrap.className="canvaswrap single";fB.style.display="none";aKind=singleKind;}
+  else if(mode===2){wrap.className="canvaswrap double";fB.style.display="flex";aKind="raw";bKind="review";}
+  else {wrap.className="canvaswrap double";fB.style.display="flex";aKind="review";bKind="trade";}
+
+  paintFrame("A",aKind,e);
+  if(bKind) paintFrame("B",bKind,e);
+
+  $("actualWlt").innerHTML=wltHTML(e.actual);
+  $("idealWlt").innerHTML=wltHTML(e.ideal);
+  $("tags").innerHTML=e.tags.map(t=>`<span class="tag">${t}</span>`).join("");
+  $("note").innerHTML = `依 <span class="rulechip">${ruleName(e.ruleId)}</span> 操作，`+(e.reviewed?"事後看進場點偏早，應等回測需求區。":"復盤圖與原圖尚未補上。");
+}
+
+function paintFrame(which,kind,e){
+  const frame=$("frame"+which), cap=$("cap"+which), canvas=$("canvas"+which);
+  cap.textContent=KIND_LABEL[kind];
+  // remove old placeholder
+  const old=frame.querySelector(".placeholder"); if(old) old.remove();
+  if(e.images[kind]){
+    canvas.style.display="block";
+    drawChart(canvas,key(curDate,curMarket)+kind,kind);
+  } else {
+    canvas.style.display="none";
+    const ph=document.createElement("div");
+    ph.className="placeholder";
+    ph.innerHTML=`<div class="icon">🖼</div><div>尚未上傳${KIND_LABEL[kind]}</div><div class="paste">聚焦此區 · Ctrl/⌘+V 貼上</div>`;
+    frame.appendChild(ph);
+  }
+}
+
+/* ---------- navigation ---------- */
+function moveDate(dir){
+  const ds=datesForMarket(curMarket);
+  if(ds.length<=1) return;
+  let i=ds.indexOf(curDate);
+  const raw=i+dir;
+  const ni=(raw+ds.length)%ds.length;
+  const wrapped = raw<0 || raw>=ds.length;
+  curDate=ds[ni]; render();
+  if(wrapped) flash(dir>0?"↩ 回到當週第一天":"↩ 跳到當週最後一天");
+}
+function moveMarket(dir){
+  const ms=marketsForDate(curDate);
+  if(ms.length<=1) return;
+  let i=ms.indexOf(curMarket);
+  const ni=(i+dir+ms.length)%ms.length;
+  curMarket=ms[ni]; render();
+  flash(curMarket);
+}
+function cycleKind(){
+  if(mode!==1){mode=1;render();return;}
+  const order=["trade","raw","review"];
+  let i=order.indexOf(singleKind);
+  // skip kinds without image
+  const e=entries[key(curDate,curMarket)];
+  for(let n=0;n<3;n++){ i=(i+1)%3; if(e.images[order[i]]){singleKind=order[i];break;} }
+  render();
+}
+
+function isTyping(){ const a=document.activeElement; return a && (a.tagName==="INPUT"||a.tagName==="TEXTAREA"||a.tagName==="SELECT"||a.isContentEditable); }
+document.addEventListener("keydown",ev=>{
+  if(isTyping()) return;
+  if(currentView==="viewer"){
+    if(ev.key==="ArrowRight"){moveDate(1);ev.preventDefault();}
+    else if(ev.key==="ArrowLeft"){moveDate(-1);ev.preventDefault();}
+    else if(ev.key==="ArrowUp"){moveMarket(-1);ev.preventDefault();}
+    else if(ev.key==="ArrowDown"){moveMarket(1);ev.preventDefault();}
+    else if(ev.key==="1"){mode=1;render();}
+    else if(ev.key==="2"){mode=2;render();}
+    else if(ev.key==="3"){mode=3;render();}
+    else if(ev.key===" "){cycleKind();ev.preventDefault();}
+  } else if(currentView==="record"){
+    if(ev.key==="ArrowRight"){recMoveDate(1);ev.preventDefault();}
+    else if(ev.key==="ArrowLeft"){recMoveDate(-1);ev.preventDefault();}
+    else if(ev.key==="ArrowUp"){recMoveMarket(-1);ev.preventDefault();}
+    else if(ev.key==="ArrowDown"){recMoveMarket(1);ev.preventDefault();}
+  }
+});
+$("weekPrev").addEventListener("click",()=>selectWeek((curWeek-1+WEEKS.length)%WEEKS.length));
+$("weekNext").addEventListener("click",()=>selectWeek((curWeek+1)%WEEKS.length));
+document.querySelectorAll(".modebtn").forEach(b=>b.addEventListener("click",()=>{mode=+b.dataset.mode;render();}));
+document.querySelectorAll(".kindpill").forEach(p=>p.addEventListener("click",()=>{singleKind=p.dataset.kind;mode=1;render();}));
+
+/* ---------- record view ---------- */
+let recDate = DATES[6] || DATES[0];
+let recMarket = MARKETS[0];
+
+/* date helpers */
+function toStr(dt){ return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0"); }
+function addDays(s,n){ const dt=new Date(s+"T00:00:00"); dt.setDate(dt.getDate()+n); return toStr(dt); }
+function dLabel(s){ return { dd: fmtMD(s), ww: "週"+WEEK[new Date(s+"T00:00:00").getDay()] }; }
+
+/* record navigation — 與復盤頁同款 ↑↓←→，日期以日曆天前後移動 */
+function recMoveDate(dir){ recDate = addDays(recDate, dir); renderRecord(); }
+function recMoveMarket(dir){
+  let i = MARKETS.indexOf(recMarket);
+  recMarket = MARKETS[(i+dir+MARKETS.length)%MARKETS.length];
+  renderRecord(); flash(recMarket);
+}
+
+/* calendar */
+let calY, calM; // displayed month
+function openCal(){
+  const [y,m]=recDate.split("-").map(Number); calY=y; calM=m; renderCal();
+  $("calPop").hidden=false;
+}
+function renderCal(){
+  const first=new Date(calY,calM-1,1); const startDow=first.getDay();
+  const days=new Date(calY,calM,0).getDate();
+  let cells="";
+  for(let i=0;i<startDow;i++) cells+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=days;d++){
+    const s=`${calY}-${String(calM).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const sel=s===recDate?"sel":"";
+    const dot=entries[key(s,recMarket)]?`<span class="hasdot"></span>`:"";
+    cells+=`<div class="cal-cell ${sel}" data-date="${s}">${d}${dot}</div>`;
+  }
+  $("calPop").innerHTML=`
+    <div class="cal-head">
+      <span class="cal-nav" data-mon="-1">‹</span>
+      <span class="cal-title">${calY} / ${String(calM).padStart(2,"0")}</span>
+      <span class="cal-nav" data-mon="1">›</span>
+    </div>
+    <div class="cal-grid">
+      ${["日","一","二","三","四","五","六"].map(w=>`<div class="cal-dow">${w}</div>`).join("")}
+      ${cells}
+    </div>`;
+}
+
+function stepperHTML(kind,letter,val,disabled){
+  const cls = letter.toLowerCase();
+  const v = val==null ? "–" : val;
+  return `<div class="stepper ${cls}" data-kind="${kind}" data-letter="${letter}">
+    <button data-delta="-1" ${disabled?"disabled":""}>−</button>
+    <span class="sk">${letter}</span><span class="val">${v}</span>
+    <button data-delta="1" ${disabled?"disabled":""}>＋</button>
+  </div>`;
+}
+
+function paintRecSlot(container,kind,has){
+  const box=document.createElement("div");
+  box.className="imgslot";
+  if(has){
+    box.innerHTML=`<div class="slot-cap"><span>${KIND_LABEL[kind]}</span><span class="replace">↻ 重新貼上</span></div>
+      <div class="slot-canvas"><canvas></canvas></div>`;
+    container.appendChild(box);
+    drawChart(box.querySelector("canvas"), recDate+recMarket+kind+"rec", kind);
+  } else {
+    box.innerHTML=`<div class="slot-cap"><span>${KIND_LABEL[kind]}</span></div>
+      <div class="pastezone">
+        <div class="pz-ico">🖼</div>
+        <div class="pz-main">貼上 ${KIND_LABEL[kind]}</div>
+        <div class="pz-sub">Ctrl / ⌘ + V · 或拖放 · 或點擊選檔</div>
+      </div>`;
+    container.appendChild(box);
+  }
+}
+
+function renderRecord(){
+  // market stack (full list, wraps)
+  let mi=MARKETS.indexOf(recMarket);
+  $("recMktCur").textContent=recMarket;
+  $("recMktPrev").textContent=MARKETS[(mi-1+MARKETS.length)%MARKETS.length];
+  $("recMktNext").textContent=MARKETS[(mi+1)%MARKETS.length];
+  // date stack (calendar days)
+  const c=dLabel(recDate), p=dLabel(addDays(recDate,-1)), n=dLabel(addDays(recDate,1));
+  $("recDateCurD").textContent=c.dd; $("recDateCurW").textContent=c.ww;
+  $("recDatePrevD").textContent=p.dd; $("recDatePrevW").textContent=p.ww;
+  $("recDateNextD").textContent=n.dd; $("recDateNextW").textContent=n.ww;
+  $("calBtnLabel").textContent=recDate;
+  if(!$("calPop").hidden) renderCal();
+
+  const e = entries[key(recDate,recMarket)];
+
+  // status badge
+  const b=$("recBadge");
+  if(!e){ b.className="badge recorded"; b.style.opacity=".7"; b.innerHTML='<span class="b-dot" style="background:var(--faint)"></span>待記錄'; }
+  else if(e.reviewed){ b.style.opacity="1"; b.className="badge reviewed"; b.innerHTML='<span class="b-dot"></span>已復盤'; }
+  else { b.style.opacity="1"; b.className="badge recorded"; b.innerHTML='<span class="b-dot"></span>已記錄（待復盤）'; }
+
+  // slots
+  const tRow=$("slotTradeRow"); tRow.innerHTML="";
+  paintRecSlot(tRow,"trade", e ? e.images.trade : false);
+  const rRow=$("slotReviewRow"); rRow.innerHTML="";
+  paintRecSlot(rRow,"raw", e ? e.images.raw : false);
+  paintRecSlot(rRow,"review", e ? e.images.review : false);
+
+  // WLT
+  const a = e ? e.actual : {w:0,l:0,t:0};
+  $("actualWltEdit").innerHTML = stepperHTML("actual","W",a.w)+stepperHTML("actual","L",a.l)+stepperHTML("actual","T",a.t);
+  const idl = e ? e.ideal : null;
+  const iv = idl || {w:null,l:null,t:null};
+  $("idealWltEdit").innerHTML = stepperHTML("ideal","W",iv.w,!idl)+stepperHTML("ideal","L",iv.l,!idl)+stepperHTML("ideal","T",iv.t,!idl);
+  $("idealHint").textContent = idl ? "" : "（尚未復盤，復盤時再填）";
+
+  // tags
+  const tags = e ? e.tags : [];
+  $("recTags").innerHTML = tags.map(t=>`<span class="tag">${t}</span>`).join("") + `<span class="tag add">＋ 新增</span>`;
+
+  // note (editable; chips carry rule id)
+  if(e){
+    $("recNote").innerHTML = `依 <span class="rulechip" contenteditable="false" data-id="${e.ruleId}">${ruleName(e.ruleId)}</span>&nbsp;操作。`+(e.reviewed?"事後看進場點偏早，應等回測需求區再進。":"");
+  } else {
+    $("recNote").innerHTML = "";
+  }
+}
+
+// stepper +/- (visual only)
+document.getElementById("viewRecord").addEventListener("click",ev=>{
+  const btn=ev.target.closest(".stepper button"); if(!btn||btn.disabled) return;
+  const val=btn.parentElement.querySelector(".val");
+  let n=parseInt(val.textContent,10); if(isNaN(n)) n=0;
+  n=Math.max(0,n+ +btn.dataset.delta); val.textContent=n;
+});
+
+// calendar
+$("calBtn").addEventListener("click",ev=>{ ev.stopPropagation(); if($("calPop").hidden) openCal(); else $("calPop").hidden=true; });
+$("calPop").addEventListener("click",ev=>{
+  ev.stopPropagation();
+  const nav=ev.target.closest(".cal-nav");
+  if(nav){ calM+=+nav.dataset.mon; if(calM<1){calM=12;calY--;} if(calM>12){calM=1;calY++;} renderCal(); return; }
+  const cell=ev.target.closest(".cal-cell[data-date]");
+  if(cell){ recDate=cell.dataset.date; $("calPop").hidden=true; renderRecord(); }
+});
+document.addEventListener("click",()=>{ if(!$("calPop").hidden) $("calPop").hidden=true; });
+
+/* ---------- @ mention in note ---------- */
+const noteEl = $("recNote");
+const mPop = $("mentionPop");
+let mMatches=[], mActive=0, mRange=null;
+function hideMention(){ mPop.hidden=true; mRange=null; }
+
+noteEl.addEventListener("input", ()=>{
+  const sel=window.getSelection();
+  if(!sel.rangeCount){hideMention();return;}
+  const range=sel.getRangeAt(0);
+  const node=range.startContainer;
+  if(node.nodeType!==3){hideMention();return;}
+  const off=range.startOffset;
+  const m=node.textContent.slice(0,off).match(/@([^\s@]*)$/);
+  if(!m){hideMention();return;}
+  mRange={node, start:off-m[0].length, end:off};
+  showMention(m[1]);
+});
+
+function showMention(q){
+  mMatches=RULE_DEFS.filter(r=>r.name.includes(q)||r.group.includes(q));
+  mActive=0;
+  if(!mMatches.length){ mPop.innerHTML=`<div class="mention-empty">找不到符合「${q}」的規則</div>`; }
+  else { mPop.innerHTML=mMatches.map((r,i)=>`<div class="mention-item ${i===0?'active':''}" data-i="${i}"><span class="mi-name">${r.name}</span><span class="mi-grp">${r.group}</span></div>`).join(""); }
+  const sel=window.getSelection(); const r=sel.getRangeAt(0).cloneRange(); r.collapse(true);
+  let rect=r.getBoundingClientRect();
+  if(!rect || (rect.left===0 && rect.top===0)) rect=noteEl.getBoundingClientRect();
+  mPop.style.left=Math.max(8,Math.min(rect.left, window.innerWidth-248))+"px";
+  mPop.style.top=(rect.bottom+6)+"px";
+  mPop.hidden=false;
+}
+
+function pickMention(i){
+  const def=mMatches[i]; if(!def||!mRange) return;
+  const {node,start,end}=mRange;
+  const after=node.textContent.slice(end);
+  node.textContent=node.textContent.slice(0,start);
+  const chip=document.createElement("span");
+  chip.className="rulechip"; chip.contentEditable="false"; chip.dataset.id=def.id; chip.textContent=def.name;
+  const tail=document.createTextNode(" "+after);
+  const parent=node.parentNode, ref=node.nextSibling;
+  parent.insertBefore(chip, ref); parent.insertBefore(tail, ref);
+  const sel=window.getSelection(); const rr=document.createRange();
+  rr.setStart(tail,1); rr.collapse(true); sel.removeAllRanges(); sel.addRange(rr);
+  hideMention(); noteEl.focus();
+}
+
+mPop.addEventListener("mousedown", ev=>{
+  const item=ev.target.closest(".mention-item"); if(!item) return;
+  ev.preventDefault(); pickMention(+item.dataset.i);
+});
+noteEl.addEventListener("keydown", ev=>{
+  if(mPop.hidden || !mMatches.length) { if(!mPop.hidden && ev.key==="Escape"){hideMention();ev.preventDefault();} return; }
+  if(ev.key==="ArrowDown"){ mActive=(mActive+1)%mMatches.length; updMentionActive(); ev.preventDefault(); }
+  else if(ev.key==="ArrowUp"){ mActive=(mActive-1+mMatches.length)%mMatches.length; updMentionActive(); ev.preventDefault(); }
+  else if(ev.key==="Enter"){ pickMention(mActive); ev.preventDefault(); }
+  else if(ev.key==="Escape"){ hideMention(); ev.preventDefault(); }
+});
+function updMentionActive(){ [...mPop.children].forEach((c,i)=>c.classList.toggle("active",i===mActive)); }
+
+/* ---------- view switching ---------- */
+let currentView = "record";
+function refresh(){ if(currentView==="record") renderRecord(); else if(currentView==="viewer") render(); }
+function switchView(v){
+  currentView = v;
+  const isRecord=v==="record", isViewer=v==="viewer";
+  $("viewRecord").hidden=!isRecord;
+  $("viewViewer").hidden=!isViewer;
+  $("viewStub").hidden=isRecord||isViewer;
+  document.querySelectorAll(".navitem").forEach(n=>n.classList.toggle("active",n.dataset.view===v));
+  if(!isRecord&&!isViewer){
+    const map={tag:["🏷","標籤"],rules:["📐","交易規則"],settings:["⚙","設定"]};
+    const m=map[v]||["•",v];
+    $("stubIco").textContent=m[0]; $("stubName").textContent=m[1];
+  }
+  refresh();
+}
+document.querySelectorAll(".navitem").forEach(n=>n.addEventListener("click",()=>switchView(n.dataset.view)));
+
+/* ---------- theme ---------- */
+$("themeBtn").addEventListener("click",()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const sysDark=matchMedia("(prefers-color-scheme: dark)").matches;
+  const next=(cur? cur==="dark":sysDark)?"light":"dark";
+  document.documentElement.setAttribute("data-theme",next);
+  refresh();
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",refresh);
+
+/* ---------- resize ---------- */
+let rt; new ResizeObserver(()=>{clearTimeout(rt);rt=setTimeout(refresh,60);}).observe(document.querySelector(".main"));
+
+switchView("record");
+</script>
