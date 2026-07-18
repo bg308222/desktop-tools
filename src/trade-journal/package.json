@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "交易記錄與復盤工具",
+  "author": "andy.lin",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
