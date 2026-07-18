@@ -14,20 +14,24 @@ install tool:
 run tool:
     cd src/{{tool}} && bun run dev
 
-# 建置某工具的安裝檔；目標預設為 windows（可傳 mac / linux）
+# 建置某工具；目標預設 windows（可傳 mac / linux）。產物搬到 ./dist/<工具>.<ext>
 build tool target="windows":
     #!/usr/bin/env bash
     set -euo pipefail
-    cd src/{{tool}}
+    root="{{justfile_directory()}}"
+    cd "$root/src/{{tool}}"
     bun run build
     case "{{target}}" in
-      windows|win) flag=--win ;;
-      mac|macos)   flag=--mac ;;
-      linux)       flag=--linux ;;
-      *)           flag="--{{target}}" ;;
+      windows|win) flag=--win;   ext=exe ;;
+      mac|macos)   flag=--mac;   ext=dmg ;;
+      linux)       flag=--linux; ext=AppImage ;;
+      *)           flag="--{{target}}"; ext="{{target}}" ;;
     esac
     echo "▶ electron-builder $flag"
     bunx electron-builder "$flag"
+    mkdir -p "$root/dist"
+    cp "release/{{tool}}.$ext" "$root/dist/{{tool}}.$ext"
+    echo "✔ 產出：./dist/{{tool}}.$ext"
 
 # 執行某工具的測試
 test tool:

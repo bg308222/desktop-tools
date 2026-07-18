@@ -8,16 +8,18 @@ files:
 # sql.js 於執行時 require，且需讀取 .wasm 檔 → 解壓出 asar
 asarUnpack:
   - '**/node_modules/sql.js/**'
+# 產物用工具名稱命名，方便 justfile 搬到 ./dist/<name>.<ext>
 linux:
   target:
     - AppImage
   category: Office
+  artifactName: ${name}.${ext}
 win:
   target:
     - portable
 portable:
-  # 免安裝單一 exe 的檔名
-  artifactName: ${productName}-${version}-portable.${ext}
+  artifactName: ${name}.${ext}
 mac:
   target:
     - dmg
+  artifactName: ${name}.${ext}
