@@ -10,13 +10,19 @@
 
 ## 開發
 
+以根目錄的 `justfile` 為統一入口，傳入工具名稱操作：
+
 ```bash
-cd src/trade-journal
-bun install
-bun run rebuild   # 對 Electron ABI 重編 better-sqlite3
-bun run dev       # 啟動開發視窗
-bun run test      # 執行測試
+just               # 列出所有指令
+just install trade-journal   # 安裝相依
+just run trade-journal       # 開發模式啟動
+just test trade-journal      # 執行測試
+just build trade-journal     # 建置（預設 Windows 免安裝單一 exe）
+just build trade-journal mac # 或指定 mac / linux
 ```
+
+> `build` 目標預設為 windows，產出免安裝的單一 `.exe`（portable）。
+> 從 Linux/WSL 交叉編譯 Windows 版需安裝 Wine；或直接於 Windows 端建置。
 
 ## 文件
 

@@ -14,7 +14,10 @@ linux:
   category: Office
 win:
   target:
-    - nsis
+    - portable
+portable:
+  # 免安裝單一 exe 的檔名
+  artifactName: ${productName}-${version}-portable.${ext}
 mac:
   target:
     - dmg
