@@ -1,0 +1,47 @@
+name: build-trade-journal
+
+# 在 GitHub 雲端的 Windows 機器上建置，產出免安裝 exe。
+# 本機不需安裝或設定任何東西（免 wine、免本機 Windows）。
+on:
+  workflow_dispatch: {} # 可在 Actions 頁面手動按「Run workflow」
+  push:
+    branches: [main]
+    paths: ['src/trade-journal/**', '.github/workflows/build-trade-journal.yml']
+    tags: ['trade-journal-v*']
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: src/trade-journal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 安裝相依
+        run: bun install
+
+      - name: 建置 renderer 與 electron
+        run: bun run build
+
+      - name: 打包 Windows 免安裝 exe
+        run: bunx electron-builder --win --publish never
+
+      - name: 上傳 exe（Actions artifact）
+        uses: actions/upload-artifact@v4
+        with:
+          name: trade-journal-windows
+          path: src/trade-journal/release/*.exe
+          if-no-files-found: error
+
+      # 推 tag（trade-journal-v*）時，把 exe 附到 GitHub Release
+      - name: 建立 Release（僅 tag 觸發）
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src/trade-journal/release/*.exe
