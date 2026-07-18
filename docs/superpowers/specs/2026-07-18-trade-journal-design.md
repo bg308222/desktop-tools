@@ -33,7 +33,7 @@
 | 前端 | **React** | 生態與元件庫支援最廣。 |
 | UI 元件庫 | **Mantine** | `DatePicker` 原生支援「日→月→年」下鑽；內建 Combobox/表單/通知，適合資料密集桌面工具。 |
 | 備註編輯器 | **TipTap**（含 mention 擴充） | 需要在多行輸入中嵌入「規則 chip」，純 `<textarea>` 無法承載 id-bound 節點。 |
-| 資料庫 | **SQLite**（`better-sqlite3`，同步 API） | 有標籤篩選、規則引用、跨日查詢等關聯需求；同步 API 在主進程使用單純。 |
+| 資料庫 | **SQLite via `sql.js`（WebAssembly）** | 有標籤篩選、規則引用、跨日查詢等關聯需求。改用 WASM 版而非原生 `better-sqlite3`：開發環境無 C/C++ toolchain 且無法安裝，WASM 版免原生編譯、在 Electron 主進程與 Vitest 皆可執行。以薄封裝提供 `prepare/run/get/all/transaction` 介面，repository 與驅動解耦，日後有 toolchain 可無痛換回原生。持久化：啟動時載入 `journal.db` bytes，寫入後 debounce 匯出回檔案。 |
 | 圖片儲存 | **檔案系統**（DB 僅存相對路徑） | DB 輕巧、整個資料夾複製即備份。 |
 | 工具鏈 | **Bun** + **Vite** | Bun 作套件管理，Vite 建置 renderer。 |
 | 測試 | **Vitest** | 主進程 repository、純函式邏輯、renderer 元件皆可測。 |

@@ -13,7 +13,7 @@
 - 語言：TypeScript 全程（main / preload / renderer / shared），`strict: true`。
 - 套件管理用 `bun install`；執行/建置腳本透過 `bun run`。
 - renderer 不得開啟 `nodeIntegration`；一律走 `contextBridge` 暴露的 `window.api`。
-- 資料庫：better-sqlite3（同步 API），僅在 main process 使用；需 `electron-rebuild` 對 Electron ABI 重編。
+- 資料庫：**SQLite via `sql.js`（WASM）**，僅在 main process 使用（免原生編譯，因環境無 toolchain）。以薄封裝 `electron/db/sqljs.ts` 提供 `prepare().run/get/all`、`exec`、`transaction`、`persist()`；repository 只依賴此封裝。持久化：載入檔案 bytes → `new SQL.Database(bytes)`；寫入後 debounce `export()` 寫回。測試用記憶體 DB（不落檔）。
 - 圖片存檔案，DB 只存相對於資料根目錄的路徑。資料根：`app.getPath('userData')/trade-journal`。
 - 核心單位為 entry＝(market_id, trade_date) 唯一。
 - 測試：純邏輯與 repository 用 Vitest；repository 測記憶體 SQLite（`:memory:`）。
