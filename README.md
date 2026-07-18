@@ -1,10 +1,25 @@
-﻿這只是暫時性的 readme
-在首個工具完成時會被重寫
+# desktop-tools
 
-本專案會做多個獨立的桌面應用
-./src/<a>
-./src/<b>
-就是兩個獨立的工具
+用 Bun + TypeScript 開發的個人桌面工具集合。每個工具是 `src/` 下獨立的 Electron 應用，各自帶 `package.json`、可獨立安裝與建置。
 
-還不確定用 electron 或 electrobun
-希朢用 bun + typescript 開發
+## 工具
+
+| 工具 | 路徑 | 說明 |
+|---|---|---|
+| trade-journal | `src/trade-journal` | 交易記錄與復盤工具（第一個工具，開發中） |
+
+## 開發
+
+```bash
+cd src/trade-journal
+bun install
+bun run rebuild   # 對 Electron ABI 重編 better-sqlite3
+bun run dev       # 啟動開發視窗
+bun run test      # 執行測試
+```
+
+## 文件
+
+- 設計文件：`docs/superpowers/specs/`
+- 實作計畫：`docs/superpowers/plans/`
+- 互動原型：`docs/superpowers/specs/prototypes/`
