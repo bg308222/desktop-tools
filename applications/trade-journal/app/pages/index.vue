@@ -6,6 +6,8 @@ import { deriveStatus } from '../lib/completeness'
 
 const api = useApi()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
+const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
+const wd = (d: string | dayjs.Dayjs) => '週' + WEEKDAY[dayjs(d).day()]
 
 const markets = ref<Market[]>([])
 const allTags = ref<Tag[]>([])
@@ -163,15 +165,18 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
       <div class="flex flex-col items-center gap-2 justify-self-center">
         <div class="flex items-center gap-4">
           <span class="font-mono text-dimmed">←</span>
-          <span class="text-sm text-dimmed font-mono w-[54px] text-center">{{
-            dayjs(curDate).add(-1, 'day').format('M/D')
-          }}</span>
-          <span class="font-semibold text-xl font-mono w-20 text-center">{{
-            dayjs(curDate).format('M/D')
-          }}</span>
-          <span class="text-sm text-dimmed font-mono w-[54px] text-center">{{
-            dayjs(curDate).add(1, 'day').format('M/D')
-          }}</span>
+          <div class="flex flex-col items-center w-[54px] text-dimmed">
+            <span class="text-sm font-mono">{{ dayjs(curDate).add(-1, 'day').format('M/D') }}</span>
+            <span class="text-[10px]">{{ wd(dayjs(curDate).add(-1, 'day')) }}</span>
+          </div>
+          <div class="flex flex-col items-center w-24">
+            <span class="font-semibold text-xl font-mono">{{ dayjs(curDate).format('M/D') }}</span>
+            <span class="text-xs text-dimmed">{{ wd(curDate) }}</span>
+          </div>
+          <div class="flex flex-col items-center w-[54px] text-dimmed">
+            <span class="text-sm font-mono">{{ dayjs(curDate).add(1, 'day').format('M/D') }}</span>
+            <span class="text-[10px]">{{ wd(dayjs(curDate).add(1, 'day')) }}</span>
+          </div>
           <span class="font-mono text-dimmed">→</span>
         </div>
         <input
