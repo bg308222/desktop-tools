@@ -1,0 +1,23 @@
+# trade-journal — app 專屬指令
+
+# 起前後端（Nuxt dev server）
+dev:
+    bun install
+    bun run dev
+
+# 版本 +1 並 commit（type：patch/minor/major）
+bump type="patch":
+    npm version {{type}} --no-git-tag-version
+    git add package.json
+    git commit -m "chore(trade-journal): bump 版本至 $(node -p "require('./package.json').version")"
+
+# build docker image trade-journal:<version>
+build:
+    docker build -t trade-journal:$(node -p "require('./package.json').version") .
+
+# 測試 / 型別檢查
+test:
+    bun run test
+
+typecheck:
+    bun run typecheck

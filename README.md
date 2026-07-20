@@ -1,38 +1,30 @@
-# desktop-tools
+# web-apps
 
-用 Bun + TypeScript 開發的個人桌面工具集合。每個工具是 `src/` 下獨立的 Electron 應用，各自帶 `package.json`、可獨立安裝與建置。
+用 Bun + Nuxt（Vue 全端）開發的個人 web 應用集合。每個工具是 `applications/` 下獨立的 Nuxt app，各自帶 `package.json`、`justfile`、`Dockerfile`，可獨立開發與容器化。
+
+> 與另一個純靜態前端的 `web-tools` 專案區隔：這裡的每個 app 都有後端（Nitro）與資料（SQLite + 圖片）。
 
 ## 工具
 
 | 工具 | 路徑 | 說明 |
 |---|---|---|
-| trade-journal | `src/trade-journal` | 交易記錄與復盤工具（第一個工具，開發中） |
+| trade-journal | `applications/trade-journal` | 交易記錄與復盤工具 |
 
 ## 開發（本機）
 
-本機只做開發。以根目錄的 `justfile` 為入口，傳入工具名稱：
+以根目錄 `justfile` 為入口：
 
 ```bash
-just                         # 列出所有指令
-just install trade-journal   # 安裝相依
-just run trade-journal       # 開發模式啟動
-just test trade-journal      # 執行測試
-just typecheck trade-journal # 型別檢查
+just                      # 列出指令
+just dev trade-journal    # 起前後端（Nuxt dev）
+just bump trade-journal   # 版本 patch +1 並 commit
+just build trade-journal  # build docker image
 ```
 
-## 建置與發佈（GitHub Actions）
+## 資料與部署
 
-**不在本機打包**——所有可散佈的執行檔都由 GitHub Actions 在對應平台的雲端機器上產出（免 wine、免本機設定）。
-
-- workflow：`.github/workflows/build-<工具>.yml`
-- 觸發：push 到 `main`（動到該工具時）、Actions 頁面手動 **Run workflow**、或推 `<工具>-v*` tag
-- 取得產物：Actions 該次執行的 **Artifacts**；推 tag 則自動附到 **Releases**
-
-例如發佈 trade-journal 正式版：
-
-```bash
-git tag trade-journal-v0.1.0 && git push origin trade-journal-v0.1.0
-```
+- 資料存 `DATA_DIR`（開發預設各 app 的 `./data`，已 gitignore；Docker 掛 `/data`）。
+- 每個 app 用 `just build <app>` 產出 `image <app>:<version>`，以容器部署。
 
 ## 文件
 
