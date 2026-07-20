@@ -7,7 +7,6 @@ import { datesForMarket, marketsForDate, stepIndex } from '../lib/viewerNav'
 import { deriveStatus } from '../lib/completeness'
 
 const api = useApi()
-const prefs = usePrefs()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const KIND_ORDER: ImageKind[] = ['trade', 'raw', 'review']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
@@ -41,13 +40,6 @@ const marketOrder = computed(() => markets.value.map((m) => m.id))
 const marketName = (id: string | null) => markets.value.find((m) => m.id === id)?.name ?? '—'
 
 onMounted(async () => {
-  // 還原上次瀏覽狀態
-  if (prefs.viewer.weekStart) weekStart.value = prefs.viewer.weekStart
-  mode.value = prefs.viewer.mode
-  singleKind.value = prefs.viewer.singleKind
-  curMarket.value = prefs.viewer.market
-  curDate.value = prefs.viewer.date
-
   markets.value = await api.markets.list()
   allDates.value = new Set(await api.entries.dates())
 })
@@ -91,15 +83,6 @@ watch(
   },
   { immediate: true },
 )
-
-// 記住瀏覽狀態
-watch([weekStart, curMarket, curDate, mode, singleKind], () => {
-  prefs.viewer.weekStart = weekStart.value
-  prefs.viewer.market = curMarket.value
-  prefs.viewer.date = curDate.value
-  prefs.viewer.mode = mode.value
-  prefs.viewer.singleKind = singleKind.value
-})
 
 const dates = computed(() =>
   curMarket.value ? datesForMarket(entries.value, curMarket.value, weekDates.value) : [],

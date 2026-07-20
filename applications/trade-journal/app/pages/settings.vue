@@ -2,16 +2,10 @@
 import type { Market } from '../../shared/domain'
 
 const api = useApi()
-const toast = useToast()
 
 const markets = ref<Market[]>([])
 const name = ref('')
 const folder = ref('')
-
-function clearBrowsingState() {
-  clearPrefs()
-  toast.add({ color: 'success', title: '已清空瀏覽狀態', description: '市場、週、日期與顯示模式已重設。' })
-}
 
 async function reload() {
   markets.value = await api.markets.list()
@@ -103,16 +97,6 @@ async function toggleArchived(m: Market) {
       <code class="block text-sm bg-elevated/60 rounded px-3 py-2 overflow-hidden text-ellipsis whitespace-nowrap">{{
         folder
       }}</code>
-    </div>
-
-    <div class="border border-default rounded-lg p-4">
-      <p class="font-semibold mb-1">瀏覽狀態</p>
-      <p class="text-sm text-dimmed mb-3">
-        清除記住的市場、週、日期與圖片顯示模式（存在瀏覽器 localStorage）。
-      </p>
-      <UButton color="neutral" variant="outline" icon="i-lucide-eraser" @click="clearBrowsingState"
-        >清空瀏覽狀態</UButton
-      >
     </div>
   </div>
 </template>

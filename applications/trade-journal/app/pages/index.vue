@@ -5,7 +5,6 @@ import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
 
 const api = useApi()
-const prefs = usePrefs()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 
 const markets = ref<Market[]>([])
@@ -22,20 +21,9 @@ const tagDraft = ref('')
 onMounted(async () => {
   const ms = await api.markets.list()
   markets.value = ms
-  const savedM = prefs.record.market
-  curMarket.value =
-    savedM && ms.some((m) => m.id === savedM)
-      ? savedM
-      : (ms.find((m) => !m.archived)?.id ?? ms[0]?.id ?? null)
-  if (prefs.record.date) curDate.value = prefs.record.date
+  curMarket.value = curMarket.value ?? ms.find((m) => !m.archived)?.id ?? ms[0]?.id ?? null
   allTags.value = await api.tags.list()
   rules.value = await api.rules.list()
-})
-
-// 記住目前市場 / 日期
-watch([curMarket, curDate], () => {
-  prefs.record.market = curMarket.value
-  prefs.record.date = curDate.value
 })
 
 const marketOrder = computed(() => markets.value.map((m) => m.id))
