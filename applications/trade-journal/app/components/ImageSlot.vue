@@ -19,6 +19,11 @@ watch(
 const src = computed(() => useImageSrc(props.relPath))
 const hasImage = computed(() => !!props.relPath && !errored.value)
 
+const lbOpen = ref(false)
+function openLightbox() {
+  if (hasImage.value) lbOpen.value = true
+}
+
 async function onPaste(e: ClipboardEvent) {
   const file = imageFileFromPaste(e)
   if (file) {
@@ -67,6 +72,7 @@ function openPicker() {
       @dragover.prevent
       @focusin="focused = true"
       @focusout="focused = false"
+      @dblclick="openLightbox"
     >
       <img
         v-if="hasImage"
@@ -88,7 +94,17 @@ function openPicker() {
         >
       </div>
 
-      <!-- 已有圖片時，覆一顆小按鈕可換檔（點圖區會 focus 供貼上覆蓋） -->
+      <!-- 已有圖片時：放大檢視 + 換檔（點圖區會 focus 供貼上覆蓋） -->
+      <UButton
+        v-if="hasImage"
+        size="xs"
+        color="neutral"
+        variant="soft"
+        icon="i-lucide-search"
+        class="absolute bottom-2 left-2 opacity-80"
+        aria-label="放大檢視"
+        @click.stop="openLightbox"
+      />
       <UButton
         v-if="hasImage"
         size="xs"
@@ -102,5 +118,6 @@ function openPicker() {
     </div>
 
     <input ref="fileRef" type="file" accept="image/*" hidden @change="onPick" />
+    <ImageLightbox v-model:open="lbOpen" :items="[{ src, label }]" />
   </div>
 </template>
