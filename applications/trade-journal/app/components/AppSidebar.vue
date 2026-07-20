@@ -8,11 +8,31 @@ const items = [
 ]
 
 const route = useRoute()
+const router = useRouter()
 const colorMode = useColorMode()
 
 function toggleTheme() {
   colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
 }
+
+// Ctrl/⌘ + ↑/↓ 切換選單頁面（循環）
+function onKey(e: KeyboardEvent) {
+  if (!(e.ctrlKey || e.metaKey)) return
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+  const el = document.activeElement
+  if (
+    el &&
+    (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable)
+  )
+    return
+  e.preventDefault()
+  const idx = items.findIndex((it) => it.to === route.path)
+  const dir = e.key === 'ArrowDown' ? 1 : -1
+  const next = ((idx < 0 ? 0 : idx) + dir + items.length) % items.length
+  router.push(items[next]!.to)
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>

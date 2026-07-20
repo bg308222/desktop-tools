@@ -112,6 +112,7 @@ function onKey(e: KeyboardEvent) {
     (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable)
   )
     return
+  if (e.ctrlKey || e.metaKey) return // Ctrl/⌘ + 方向鍵交給 Sidebar 切頁面
   if (e.key === 'ArrowRight') moveDate(1)
   else if (e.key === 'ArrowLeft') moveDate(-1)
   else if (e.key === 'ArrowUp') moveMarket(-1)

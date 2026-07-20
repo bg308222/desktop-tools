@@ -143,8 +143,8 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === 'ArrowLeft') {
     e.preventDefault()
     weekMod ? shiftWeek(-7) : moveDate(-1)
-  } else if (e.key === 'ArrowUp') moveMarket(-1)
-  else if (e.key === 'ArrowDown') moveMarket(1)
+  } else if (e.key === 'ArrowUp' && !weekMod) moveMarket(-1)
+  else if (e.key === 'ArrowDown' && !weekMod) moveMarket(1)
   else if (e.key === '1') mode.value = 1
   else if (e.key === '2') mode.value = 2
   else if (e.key === '3') mode.value = 3
@@ -274,7 +274,7 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
     <!-- 提示列 -->
     <div class="px-6 py-2 border-t border-default">
       <span class="text-xs text-dimmed"
-        >←→ 換日期 · Ctrl/⌘ + ←→ 換週 · ↑↓ 換市場 · 1/2/3 切模式 · Space 單圖循環三圖</span
+        >←→ 換日期 · Ctrl/⌘ + ←→ 換週 · ↑↓ 換市場 · Ctrl/⌘ + ↑↓ 切頁面 · 1/2/3 切模式 · Space 單圖循環三圖</span
       >
     </div>
   </div>
