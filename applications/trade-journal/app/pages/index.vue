@@ -5,6 +5,7 @@ import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
 
 const api = useApi()
+const session = useSession()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 const wd = (d: string | dayjs.Dayjs) => '週' + WEEKDAY[dayjs(d).day()]
@@ -13,7 +14,7 @@ const markets = ref<Market[]>([])
 const allTags = ref<Tag[]>([])
 const rules = ref<Rule[]>([])
 const curMarket = ref<string | null>(null)
-const curDate = ref<string>(dayjs().format('YYYY-MM-DD'))
+const curDate = ref<string>(session.record.date ?? dayjs().format('YYYY-MM-DD'))
 
 const entry = ref<Entry | null>(null)
 const slots = ref<SlotPaths>({ ...EMPTY })
@@ -23,9 +24,19 @@ const tagDraft = ref('')
 onMounted(async () => {
   const ms = await api.markets.list()
   markets.value = ms
-  curMarket.value = curMarket.value ?? ms.find((m) => !m.archived)?.id ?? ms[0]?.id ?? null
+  const savedM = session.record.market
+  curMarket.value =
+    savedM && ms.some((m) => m.id === savedM)
+      ? savedM
+      : (ms.find((m) => !m.archived)?.id ?? ms[0]?.id ?? null)
   allTags.value = await api.tags.list()
   rules.value = await api.rules.list()
+})
+
+// 同一 session 內記住市場 / 日期（重整會重置）
+watch([curMarket, curDate], () => {
+  session.record.market = curMarket.value
+  session.record.date = curDate.value
 })
 
 const marketOrder = computed(() => markets.value.map((m) => m.id))
@@ -113,10 +124,19 @@ function onKey(e: KeyboardEvent) {
   )
     return
   if (e.ctrlKey || e.metaKey) return // Ctrl/⌘ + 方向鍵交給 Sidebar 切頁面
-  if (e.key === 'ArrowRight') moveDate(1)
-  else if (e.key === 'ArrowLeft') moveDate(-1)
-  else if (e.key === 'ArrowUp') moveMarket(-1)
-  else if (e.key === 'ArrowDown') moveMarket(1)
+  if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    moveDate(1)
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    moveDate(-1)
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    moveMarket(-1)
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    moveMarket(1)
+  }
 }
 onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))

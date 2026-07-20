@@ -7,6 +7,7 @@ import { datesForMarket, marketsForDate, stepIndex } from '../lib/viewerNav'
 import { deriveStatus } from '../lib/completeness'
 
 const api = useApi()
+const session = useSession()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const KIND_ORDER: ImageKind[] = ['trade', 'raw', 'review']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
@@ -24,12 +25,12 @@ function neighbor(arr: string[], cur: string, dir: 1 | -1): string | null {
 }
 
 const markets = ref<Market[]>([])
-const weekStart = ref<string>(mondayOf(dayjs().format('YYYY-MM-DD')))
+const weekStart = ref<string>(session.viewer.weekStart ?? mondayOf(dayjs().format('YYYY-MM-DD')))
 const entries = ref<Entry[]>([])
-const curMarket = ref<string | null>(null)
-const curDate = ref<string | null>(null)
-const mode = ref<1 | 2 | 3>(1)
-const singleKind = ref<ImageKind>('trade')
+const curMarket = ref<string | null>(session.viewer.market)
+const curDate = ref<string | null>(session.viewer.date)
+const mode = ref<1 | 2 | 3>(session.viewer.mode)
+const singleKind = ref<ImageKind>(session.viewer.singleKind)
 const slots = ref<SlotPaths>({ ...EMPTY })
 const allDates = ref<Set<string>>(new Set())
 
@@ -83,6 +84,15 @@ watch(
   },
   { immediate: true },
 )
+
+// 同一 session 內記住瀏覽狀態（重整會重置）
+watch([weekStart, curMarket, curDate, mode, singleKind], () => {
+  session.viewer.weekStart = weekStart.value
+  session.viewer.market = curMarket.value
+  session.viewer.date = curDate.value
+  session.viewer.mode = mode.value
+  session.viewer.singleKind = singleKind.value
+})
 
 const dates = computed(() =>
   curMarket.value ? datesForMarket(entries.value, curMarket.value, weekDates.value) : [],
@@ -143,9 +153,13 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === 'ArrowLeft') {
     e.preventDefault()
     weekMod ? shiftWeek(-7) : moveDate(-1)
-  } else if (e.key === 'ArrowUp' && !weekMod) moveMarket(-1)
-  else if (e.key === 'ArrowDown' && !weekMod) moveMarket(1)
-  else if (e.key === '1') mode.value = 1
+  } else if (e.key === 'ArrowUp' && !weekMod) {
+    e.preventDefault()
+    moveMarket(-1)
+  } else if (e.key === 'ArrowDown' && !weekMod) {
+    e.preventDefault()
+    moveMarket(1)
+  } else if (e.key === '1') mode.value = 1
   else if (e.key === '2') mode.value = 2
   else if (e.key === '3') mode.value = 3
   else if (e.key === ' ') {
