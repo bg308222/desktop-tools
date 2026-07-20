@@ -1,1 +1,2 @@
 ﻿- 用繁體中文回答
+- 所有套件都用 exact version（`package.json` 不用 `^`／`~`，寫死版本號）
