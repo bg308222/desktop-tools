@@ -111,12 +111,13 @@ onUnmounted(() => {
       v-if="open"
       class="fixed inset-0 z-50 bg-black/85 flex flex-col"
       @click.self="close"
+      @mousedown.middle.prevent="close"
     >
       <!-- 工具列 -->
       <div class="flex items-center justify-between px-4 py-2 text-white/90 text-sm">
         <span class="font-mono">{{ cur?.label }}<span v-if="items.length > 1" class="opacity-60"> · {{ idx + 1 }}/{{ items.length }}</span></span>
         <div class="flex items-center gap-3">
-          <span class="opacity-60 text-xs hidden sm:inline">滾輪縮放 · 拖曳平移 · 雙擊還原 · ←→ 切換 · Esc 關閉</span>
+          <span class="opacity-60 text-xs hidden sm:inline">滾輪縮放 · 拖曳平移 · 雙擊還原 · ←→ 切換 · Esc/中鍵 關閉</span>
           <button class="px-2 py-0.5 rounded hover:bg-white/10" aria-label="關閉" @click="close">✕</button>
         </div>
       </div>
