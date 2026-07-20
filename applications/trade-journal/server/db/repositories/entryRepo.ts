@@ -126,6 +126,13 @@ export function createEntryRepo(db: Db) {
     db.prepare(`DELETE FROM entry WHERE id = :id`).run({ id })
   }
 
+  /** 所有「有記錄」的日期（不分市場，去重、排序）——供復盤日曆停用無資料日。 */
+  const distinctDates = (): string[] =>
+    db
+      .prepare(`SELECT DISTINCT trade_date FROM entry ORDER BY trade_date`)
+      .all<{ trade_date: string }>()
+      .map((r) => r.trade_date)
+
   return {
     get,
     getById,
@@ -137,6 +144,7 @@ export function createEntryRepo(db: Db) {
     listByMarketInRange,
     listByDate,
     listByTagIds,
+    distinctDates,
     remove,
   }
 }

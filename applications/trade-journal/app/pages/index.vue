@@ -5,6 +5,7 @@ import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
 
 const api = useApi()
+const prefs = usePrefs()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 
 const markets = ref<Market[]>([])
@@ -21,9 +22,20 @@ const tagDraft = ref('')
 onMounted(async () => {
   const ms = await api.markets.list()
   markets.value = ms
-  curMarket.value = curMarket.value ?? ms.find((m) => !m.archived)?.id ?? ms[0]?.id ?? null
+  const savedM = prefs.record.market
+  curMarket.value =
+    savedM && ms.some((m) => m.id === savedM)
+      ? savedM
+      : (ms.find((m) => !m.archived)?.id ?? ms[0]?.id ?? null)
+  if (prefs.record.date) curDate.value = prefs.record.date
   allTags.value = await api.tags.list()
   rules.value = await api.rules.list()
+})
+
+// 記住目前市場 / 日期
+watch([curMarket, curDate], () => {
+  prefs.record.market = curMarket.value
+  prefs.record.date = curDate.value
 })
 
 const marketOrder = computed(() => markets.value.map((m) => m.id))
@@ -148,8 +160,8 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
 
   <div v-else class="flex flex-col h-screen">
     <!-- 頂欄 -->
-    <div class="flex justify-between items-center px-6 py-4 border-b border-default">
-      <div class="flex items-center gap-2.5">
+    <div class="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-4 border-b border-default">
+      <div class="flex items-center gap-2.5 justify-self-start">
         <div class="flex flex-col items-center leading-none text-[10px] text-dimmed font-mono">
           <span>↑</span><span>↓</span>
         </div>
@@ -160,7 +172,7 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
         </div>
       </div>
 
-      <div class="flex flex-col items-center gap-2">
+      <div class="flex flex-col items-center gap-2 justify-self-center">
         <div class="flex items-center gap-4">
           <span class="font-mono text-dimmed">←</span>
           <span class="text-sm text-dimmed font-mono w-[54px] text-center">{{
@@ -182,7 +194,7 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
         />
       </div>
 
-      <div class="flex flex-col items-end gap-1">
+      <div class="flex flex-col items-end gap-1 justify-self-end">
         <span class="text-[10px] uppercase text-dimmed">狀態</span>
         <StatusBadge :status="status" />
       </div>

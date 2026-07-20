@@ -68,6 +68,7 @@ export function useApi() {
         call(() => $fetch<Entry[]>('/api/entries', { query: { date } })),
       listByTagIds: (tagIds: string[]) =>
         call(() => $fetch<Entry[]>('/api/entries', { query: { tags: tagIds.join(',') } })),
+      dates: () => call(() => $fetch<string[]>('/api/entries/dates')),
     },
     images: {
       getByEntry: (entryId: string) =>

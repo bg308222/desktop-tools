@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
+import { parseDate, type DateValue } from '@internationalized/date'
 import type { Entry, ImageKind, Market } from '../../shared/domain'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { datesForMarket, marketsForDate, stepIndex } from '../lib/viewerNav'
 import { deriveStatus } from '../lib/completeness'
 
 const api = useApi()
+const prefs = usePrefs()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const KIND_ORDER: ImageKind[] = ['trade', 'raw', 'review']
+const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 
 function mondayOf(dateStr: string): string {
   const d = dayjs(dateStr)
@@ -29,6 +32,7 @@ const curDate = ref<string | null>(null)
 const mode = ref<1 | 2 | 3>(1)
 const singleKind = ref<ImageKind>('trade')
 const slots = ref<SlotPaths>({ ...EMPTY })
+const allDates = ref<Set<string>>(new Set())
 
 const weekDates = computed(() =>
   Array.from({ length: 5 }, (_, i) => dayjs(weekStart.value).add(i, 'day').format('YYYY-MM-DD')),
@@ -37,7 +41,15 @@ const marketOrder = computed(() => markets.value.map((m) => m.id))
 const marketName = (id: string | null) => markets.value.find((m) => m.id === id)?.name ?? '—'
 
 onMounted(async () => {
+  // 還原上次瀏覽狀態
+  if (prefs.viewer.weekStart) weekStart.value = prefs.viewer.weekStart
+  mode.value = prefs.viewer.mode
+  singleKind.value = prefs.viewer.singleKind
+  curMarket.value = prefs.viewer.market
+  curDate.value = prefs.viewer.date
+
   markets.value = await api.markets.list()
+  allDates.value = new Set(await api.entries.dates())
 })
 
 watch(
@@ -80,6 +92,15 @@ watch(
   { immediate: true },
 )
 
+// 記住瀏覽狀態
+watch([weekStart, curMarket, curDate, mode, singleKind], () => {
+  prefs.viewer.weekStart = weekStart.value
+  prefs.viewer.market = curMarket.value
+  prefs.viewer.date = curDate.value
+  prefs.viewer.mode = mode.value
+  prefs.viewer.singleKind = singleKind.value
+})
+
 const dates = computed(() =>
   curMarket.value ? datesForMarket(entries.value, curMarket.value, weekDates.value) : [],
 )
@@ -109,6 +130,22 @@ function shiftWeek(days: number) {
   weekStart.value = dayjs(weekStart.value).add(days, 'day').format('YYYY-MM-DD')
 }
 
+// 日曆跳選（停用無資料日）
+const calValue = computed<DateValue | undefined>(() =>
+  curDate.value ? parseDate(curDate.value) : undefined,
+)
+function onCalUpdate(v: unknown) {
+  if (!v || Array.isArray(v)) return
+  const s = (v as DateValue).toString()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return // 只接受單一日期
+  weekStart.value = mondayOf(s)
+  curDate.value = s
+}
+const isDateUnavailable = (d: DateValue) => !allDates.value.has(d.toString())
+const weekLabel = computed(
+  () => `${dayjs(weekStart.value).format('M/D')} – ${dayjs(weekStart.value).add(4, 'day').format('M/D')}`,
+)
+
 function onKey(e: KeyboardEvent) {
   const el = document.activeElement
   if (
@@ -116,9 +153,14 @@ function onKey(e: KeyboardEvent) {
     (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable)
   )
     return
-  if (e.key === 'ArrowRight') moveDate(1)
-  else if (e.key === 'ArrowLeft') moveDate(-1)
-  else if (e.key === 'ArrowUp') moveMarket(-1)
+  const weekMod = e.ctrlKey || e.metaKey
+  if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    weekMod ? shiftWeek(7) : moveDate(1)
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    weekMod ? shiftWeek(-7) : moveDate(-1)
+  } else if (e.key === 'ArrowUp') moveMarket(-1)
   else if (e.key === 'ArrowDown') moveMarket(1)
   else if (e.key === '1') mode.value = 1
   else if (e.key === '2') mode.value = 2
@@ -148,8 +190,9 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
 <template>
   <div class="flex flex-col h-screen">
     <!-- 頂欄 -->
-    <div class="flex justify-between items-center px-6 py-4 border-b border-default">
-      <div class="flex items-center gap-2.5">
+    <div class="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-4 border-b border-default">
+      <!-- 市場軸 -->
+      <div class="flex items-center gap-2.5 justify-self-start">
         <div class="flex flex-col items-center leading-none text-[10px] text-dimmed font-mono">
           <span>↑</span><span>↓</span>
         </div>
@@ -164,37 +207,50 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
         </div>
       </div>
 
-      <div class="flex flex-col items-center gap-2">
-        <div class="flex items-center gap-4">
-          <span class="font-mono text-dimmed">←</span>
-          <span class="text-sm text-dimmed font-mono w-[54px] text-center">{{
-            dates.length > 1 ? dayjs(neighbor(dates, curDate ?? '', -1) ?? '').format('M/D') : ''
-          }}</span>
-          <span class="font-semibold text-xl font-mono w-[72px] text-center">{{
-            curDate ? dayjs(curDate).format('M/D') : '—'
-          }}</span>
-          <span class="text-sm text-dimmed font-mono w-[54px] text-center">{{
-            dates.length > 1 ? dayjs(neighbor(dates, curDate ?? '', 1) ?? '').format('M/D') : ''
-          }}</span>
-          <span class="font-mono text-dimmed">→</span>
+      <!-- 本週有資料的日期（全部列出） + 週跳選 -->
+      <div class="flex flex-col items-center gap-2 justify-self-center">
+        <div class="flex items-center gap-1.5 flex-wrap justify-center max-w-[520px]">
+          <span class="font-mono text-dimmed text-sm">←</span>
+          <template v-if="dates.length">
+            <UButton
+              v-for="d in dates"
+              :key="d"
+              size="xs"
+              :color="d === curDate ? 'primary' : 'neutral'"
+              :variant="d === curDate ? 'solid' : 'outline'"
+              class="font-mono"
+              @click="curDate = d"
+            >
+              {{ dayjs(d).format('M/D') }}<span class="opacity-60"> 週{{ WEEKDAY[dayjs(d).day()] }}</span>
+            </UButton>
+          </template>
+          <span v-else class="text-sm text-dimmed">本週無資料</span>
+          <span class="font-mono text-dimmed text-sm">→</span>
         </div>
         <div class="flex items-center gap-2">
           <UButton size="xs" color="neutral" variant="outline" @click="shiftWeek(-7)"
             >‹ 上週</UButton
           >
-          <input
-            type="date"
-            :value="weekStart"
-            class="rounded-md border border-default bg-default px-2 py-1 text-sm"
-            @change="weekStart = mondayOf(($event.target as HTMLInputElement).value || weekStart)"
-          />
+          <UPopover>
+            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-calendar">{{
+              weekLabel
+            }}</UButton>
+            <template #content>
+              <UCalendar
+                :model-value="calValue"
+                :is-date-unavailable="isDateUnavailable"
+                class="p-2"
+                @update:model-value="onCalUpdate"
+              />
+            </template>
+          </UPopover>
           <UButton size="xs" color="neutral" variant="outline" @click="shiftWeek(7)"
             >下週 ›</UButton
           >
         </div>
       </div>
 
-      <div class="flex flex-col items-end gap-1">
+      <div class="flex flex-col items-end gap-1 justify-self-end">
         <span class="text-[10px] uppercase text-dimmed">狀態</span>
         <StatusBadge :status="realStatus" />
       </div>
@@ -227,7 +283,7 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
     <!-- 舞台 -->
     <div class="flex-1 min-h-0 px-6 pb-6">
       <div v-if="empty" class="flex items-center justify-center h-full">
-        <p class="text-dimmed">本週尚無記錄。用上週/下週或日期選擇器切換，或先到「記錄」頁新增。</p>
+        <p class="text-dimmed">本週尚無記錄。用上週/下週、日曆或先到「記錄」頁新增。</p>
       </div>
       <ViewerStage v-else :images="slots" :mode="mode" :single-kind="singleKind" />
     </div>
@@ -235,7 +291,7 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
     <!-- 提示列 -->
     <div class="px-6 py-2 border-t border-default">
       <span class="text-xs text-dimmed"
-        >←→ 換日期 · ↑↓ 換市場 · 1/2/3 切模式 · Space 單圖循環三圖 · 限縮當週、到底循環</span
+        >←→ 換日期 · Ctrl/⌘ + ←→ 換週 · ↑↓ 換市場 · 1/2/3 切模式 · Space 單圖循環三圖</span
       >
     </div>
   </div>

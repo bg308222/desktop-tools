@@ -5,7 +5,9 @@ const props = defineProps<{ label: string; relPath: string | null; canRemove?: b
 const emit = defineEmits<{ image: [string]; remove: [] }>()
 
 const fileRef = ref<HTMLInputElement | null>(null)
+const zoneRef = ref<HTMLElement | null>(null)
 const errored = ref(false)
+const focused = ref(false)
 
 watch(
   () => props.relPath,
@@ -35,28 +37,36 @@ async function onPick(e: Event) {
   if (file) emit('image', await fileToDataUrl(file))
   input.value = ''
 }
+function openPicker() {
+  fileRef.value?.click()
+}
 </script>
 
 <template>
   <div class="flex flex-col rounded-[10px] border border-default overflow-hidden bg-elevated/40">
     <div class="flex justify-between items-center px-3 py-1.5 border-b border-default">
       <span class="text-sm font-semibold text-dimmed">{{ label }}</span>
-      <span
-        v-if="hasImage && canRemove"
-        class="text-xs text-primary cursor-pointer"
-        @click="emit('remove')"
-        >↻ 重新貼上</span
-      >
+      <div class="flex items-center gap-2">
+        <span v-if="focused" class="text-xs text-primary">可貼上（Ctrl/⌘+V）</span>
+        <span
+          v-if="hasImage && canRemove"
+          class="text-xs text-error cursor-pointer"
+          @click="emit('remove')"
+          >✕ 移除</span
+        >
+      </div>
     </div>
 
     <div
+      ref="zoneRef"
       tabindex="0"
-      class="min-h-[170px] flex items-center justify-center outline-none"
-      :class="hasImage ? 'cursor-default p-0' : 'cursor-pointer p-3'"
+      class="relative min-h-[170px] flex items-center justify-center outline-none transition-shadow"
+      :class="[hasImage ? 'p-0' : 'p-3', focused ? 'ring-2 ring-primary ring-inset' : '']"
       @paste="onPaste"
       @drop="onDrop"
       @dragover.prevent
-      @click="!hasImage && fileRef?.click()"
+      @focusin="focused = true"
+      @focusout="focused = false"
     >
       <img
         v-if="hasImage"
@@ -69,11 +79,26 @@ async function onPick(e: Event) {
         <span class="text-xl">⚠️</span>
         <span class="text-sm text-dimmed">圖片遺失，可重新上傳</span>
       </div>
-      <div v-else class="flex flex-col items-center gap-1.5">
+      <div v-else class="flex flex-col items-center gap-2">
         <span class="text-2xl">🖼</span>
         <span class="text-sm font-medium text-dimmed">貼上 {{ label }}</span>
-        <span class="text-xs text-dimmed font-mono">Ctrl / ⌘ + V · 或拖放 · 或點擊選檔</span>
+        <span class="text-xs text-dimmed font-mono">點此後 Ctrl/⌘+V 貼上 · 或拖放</span>
+        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-upload" @click.stop="openPicker"
+          >選擇檔案</UButton
+        >
       </div>
+
+      <!-- 已有圖片時，覆一顆小按鈕可換檔（點圖區會 focus 供貼上覆蓋） -->
+      <UButton
+        v-if="hasImage"
+        size="xs"
+        color="neutral"
+        variant="soft"
+        icon="i-lucide-upload"
+        class="absolute bottom-2 right-2 opacity-80"
+        aria-label="更換檔案"
+        @click.stop="openPicker"
+      />
     </div>
 
     <input ref="fileRef" type="file" accept="image/*" hidden @change="onPick" />
