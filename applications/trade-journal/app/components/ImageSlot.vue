@@ -5,7 +5,6 @@ const props = defineProps<{ label: string; relPath: string | null; canRemove?: b
 const emit = defineEmits<{ image: [string]; remove: [] }>()
 
 const fileRef = ref<HTMLInputElement | null>(null)
-const zoneRef = ref<HTMLElement | null>(null)
 const errored = ref(false)
 const focused = ref(false)
 
@@ -24,6 +23,7 @@ function openLightbox() {
   if (hasImage.value) lbOpen.value = true
 }
 
+// 只在「無圖」狀態才吃貼上/拖放/選檔，避免不小心蓋掉現有圖片
 async function onPaste(e: ClipboardEvent) {
   const file = imageFileFromPaste(e)
   if (file) {
@@ -52,7 +52,7 @@ function openPicker() {
     <div class="flex justify-between items-center px-3 py-1.5 border-b border-default">
       <span class="text-sm font-semibold text-dimmed">{{ label }}</span>
       <div class="flex items-center gap-2">
-        <span v-if="focused" class="text-xs text-primary">可貼上（Ctrl/⌘+V）</span>
+        <span v-if="!hasImage && focused" class="text-xs text-primary">可貼上（Ctrl/⌘+V）</span>
         <span
           v-if="hasImage && canRemove"
           class="text-xs text-error cursor-pointer"
@@ -62,28 +62,33 @@ function openPicker() {
       </div>
     </div>
 
+    <!-- 有圖：點擊直接放大；不吃貼上/拖放（要換圖需先移除） -->
     <div
-      ref="zoneRef"
+      v-if="hasImage"
+      class="min-h-[170px] flex items-center justify-center cursor-zoom-in"
+      @click="openLightbox"
+    >
+      <img :src="src" :alt="label" class="max-w-full max-h-[320px] block" @error="errored = true" />
+    </div>
+
+    <!-- 無圖 / 遺失：可聚焦貼上、拖放、選檔 -->
+    <div
+      v-else
       tabindex="0"
-      class="relative min-h-[170px] flex items-center justify-center outline-none transition-shadow"
-      :class="[hasImage ? 'p-0' : 'p-3', focused ? 'ring-2 ring-primary ring-inset' : '']"
+      class="min-h-[170px] flex items-center justify-center outline-none p-3 transition-shadow"
+      :class="focused ? 'ring-2 ring-primary ring-inset' : ''"
       @paste="onPaste"
       @drop="onDrop"
       @dragover.prevent
       @focusin="focused = true"
       @focusout="focused = false"
-      @dblclick="openLightbox"
     >
-      <img
-        v-if="hasImage"
-        :src="src"
-        :alt="label"
-        class="max-w-full max-h-[320px] block"
-        @error="errored = true"
-      />
-      <div v-else-if="relPath && errored" class="flex flex-col items-center gap-1.5">
+      <div v-if="relPath && errored" class="flex flex-col items-center gap-1.5">
         <span class="text-xl">⚠️</span>
         <span class="text-sm text-dimmed">圖片遺失，可重新上傳</span>
+        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-upload" @click.stop="openPicker"
+          >選擇檔案</UButton
+        >
       </div>
       <div v-else class="flex flex-col items-center gap-2">
         <span class="text-2xl">🖼</span>
@@ -93,28 +98,6 @@ function openPicker() {
           >選擇檔案</UButton
         >
       </div>
-
-      <!-- 已有圖片時：放大檢視 + 換檔（點圖區會 focus 供貼上覆蓋） -->
-      <UButton
-        v-if="hasImage"
-        size="xs"
-        color="neutral"
-        variant="soft"
-        icon="i-lucide-search"
-        class="absolute bottom-2 left-2 opacity-80"
-        aria-label="放大檢視"
-        @click.stop="openLightbox"
-      />
-      <UButton
-        v-if="hasImage"
-        size="xs"
-        color="neutral"
-        variant="soft"
-        icon="i-lucide-upload"
-        class="absolute bottom-2 right-2 opacity-80"
-        aria-label="更換檔案"
-        @click.stop="openPicker"
-      />
     </div>
 
     <input ref="fileRef" type="file" accept="image/*" hidden @change="onPick" />
