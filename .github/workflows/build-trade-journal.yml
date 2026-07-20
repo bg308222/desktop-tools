@@ -26,8 +26,11 @@ jobs:
       - name: 安裝相依
         run: bun install
 
+      - name: 型別檢查
+        run: bun run typecheck
+
       - name: 建置 renderer 與 electron
-        run: bun run build
+        run: bunx vite build
 
       - name: 打包 Windows 免安裝 exe
         run: bunx electron-builder --win --publish never
