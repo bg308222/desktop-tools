@@ -25,6 +25,16 @@ just clean trade-journal  # 清空該 app 所有資料（DATA_DIR；不動 build
 
 > `mock` 用於想直接體驗前端操作時：依該 app 情況產出夠真實的示範資料（trade-journal 會生成市場、規則、數週交易記錄與 SVG K 線圖）。各 app 自帶 `scripts/mock.ts`。
 
+**省略 app 參數**：若常針對同一個 app 操作，複製 `.env.sample` 成根目錄 `.env` 並設 `APP=<app>`，之後即可省略：
+
+```bash
+cp .env.sample .env        # 內含 APP=trade-journal
+just dev                   # 等同 just dev trade-journal
+just dev other-app         # 明確傳入時仍以參數為準
+```
+
+根目錄 `.env` 不進版控（各 app 自己的 `.env` 仍會 commit）。
+
 ## 資料與部署
 
 - 資料存 `DATA_DIR`（開發預設各 app 的 `./data`，已 gitignore；Docker 掛 `/data`）。
