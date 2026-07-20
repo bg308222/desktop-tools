@@ -12,14 +12,13 @@ interface SessionState {
     weekStart: string | null
     market: string | null
     date: string | null
-    mode: 1 | 2 | 3
     singleKind: ImageKind
   }
 }
 
 const state: SessionState = reactive({
   record: { market: null, date: null },
-  viewer: { weekStart: null, market: null, date: null, mode: 1, singleKind: 'trade' },
+  viewer: { weekStart: null, market: null, date: null, singleKind: 'trade' },
 })
 
 export function useSession(): SessionState {

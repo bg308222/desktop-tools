@@ -14,7 +14,6 @@ const api = useApi()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const KIND_ORDER: ImageKind[] = ['trade', 'raw', 'review']
 
-const mode = ref<1 | 2 | 3>(1)
 const singleKind = ref<ImageKind>('trade')
 const slots = ref<SlotPaths>({ ...EMPTY })
 
@@ -30,6 +29,9 @@ watch(
   entry,
   async (e) => {
     slots.value = e ? toSlotPaths(await api.images.getByEntry(e.id)) : { ...EMPTY }
+    // 換筆後若當前圖種沒圖，落到有圖的 kind
+    const present = KIND_ORDER.filter((k) => slots.value[k])
+    if (present.length && !slots.value[singleKind.value]) singleKind.value = present[0]!
   },
   { immediate: true },
 )
@@ -38,23 +40,27 @@ function move(dir: 1 | -1) {
   if (props.index == null || props.results.length < 2) return
   emit('update:index', stepIndex(props.index, props.results.length, dir).index)
 }
+function cycleKind() {
+  const present = KIND_ORDER.filter((k) => slots.value[k])
+  if (present.length)
+    singleKind.value =
+      present[(present.indexOf(singleKind.value) + 1) % present.length] ?? present[0]!
+}
 
 function onKey(e: KeyboardEvent) {
   if (props.index == null) return
   if (e.key === 'ArrowRight') move(1)
   else if (e.key === 'ArrowLeft') move(-1)
-  else if (e.key === '1') mode.value = 1
-  else if (e.key === '2') mode.value = 2
-  else if (e.key === '3') mode.value = 3
+  else if (e.key === '1') singleKind.value = 'trade'
+  else if (e.key === '2') singleKind.value = 'raw'
+  else if (e.key === '3') singleKind.value = 'review'
   else if (e.key === ' ') {
     e.preventDefault()
-    mode.value = 1
-    const present = KIND_ORDER.filter((k) => slots.value[k])
-    if (present.length)
-      singleKind.value =
-        present[(present.indexOf(singleKind.value) + 1) % present.length] ?? present[0]!
+    cycleKind()
   }
 }
+const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ? '原圖' : '復盤圖')
+const KIND_KEY: Record<ImageKind, string> = { trade: '1', raw: '2', review: '3' }
 const overlay = useOverlayGuard()
 watch(open, (o, prev) => {
   if (o) overlay.open()
@@ -75,22 +81,24 @@ const title = computed(() =>
   <UModal v-model:open="open" :title="title" :ui="{ content: 'max-w-[90vw]' }">
     <template #body>
       <div class="flex flex-col h-[70vh]">
-        <div class="flex items-center gap-2 mb-3">
+        <div class="flex items-center gap-1.5 mb-3">
           <UButton
-            v-for="m in [1, 2, 3] as const"
-            :key="m"
+            v-for="k in KIND_ORDER"
+            :key="k"
             size="xs"
-            :color="mode === m ? 'primary' : 'neutral'"
-            :variant="mode === m ? 'subtle' : 'outline'"
-            @click="mode = m"
-            >{{ m === 1 ? '單圖' : m === 2 ? '原+復' : '復+交' }}</UButton
+            :color="singleKind === k ? 'primary' : 'neutral'"
+            :variant="singleKind === k ? 'solid' : 'outline'"
+            @click="singleKind = k"
+            >{{ KIND_KEY[k] }}　{{ kindLabel(k) }}</UButton
           >
           <div class="flex-1" />
           <UButton size="xs" color="neutral" variant="outline" @click="move(-1)">‹ 上一筆</UButton>
           <UButton size="xs" color="neutral" variant="outline" @click="move(1)">下一筆 ›</UButton>
         </div>
-        <ViewerStage :images="slots" :mode="mode" :single-kind="singleKind" />
-        <p class="text-xs text-dimmed mt-3">←→ 換上下一筆 · 1/2/3 切模式 · Space 循環三圖</p>
+        <ViewerStage :images="slots" :single-kind="singleKind" />
+        <p class="text-xs text-dimmed mt-3">
+          ←→ 換上下一筆 · 1/2/3 切交易圖/原圖/復盤圖 · Space 循環 · 點圖放大
+        </p>
       </div>
     </template>
   </UModal>

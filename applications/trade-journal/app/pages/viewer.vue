@@ -29,7 +29,6 @@ const weekStart = ref<string>(session.viewer.weekStart ?? mondayOf(dayjs().forma
 const entries = ref<Entry[]>([])
 const curMarket = ref<string | null>(session.viewer.market)
 const curDate = ref<string | null>(session.viewer.date)
-const mode = ref<1 | 2 | 3>(session.viewer.mode)
 const singleKind = ref<ImageKind>(session.viewer.singleKind)
 const slots = ref<SlotPaths>({ ...EMPTY })
 const allDates = ref<Set<string>>(new Set())
@@ -89,11 +88,10 @@ watch(
 )
 
 // 同一 session 內記住瀏覽狀態（重整會重置）
-watch([weekStart, curMarket, curDate, mode, singleKind], () => {
+watch([weekStart, curMarket, curDate, singleKind], () => {
   session.viewer.weekStart = weekStart.value
   session.viewer.market = curMarket.value
   session.viewer.date = curDate.value
-  session.viewer.mode = mode.value
   session.viewer.singleKind = singleKind.value
 })
 
@@ -116,7 +114,6 @@ function moveMarket(dir: 1 | -1) {
     marketsToday.value[stepIndex(i, marketsToday.value.length, dir).index] ?? curMarket.value
 }
 function cycleKind() {
-  mode.value = 1
   const present = KIND_ORDER.filter((k) => slots.value[k])
   if (present.length === 0) return
   const i = present.indexOf(singleKind.value)
@@ -164,9 +161,9 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === 'ArrowDown' && !weekMod) {
     e.preventDefault()
     moveMarket(1)
-  } else if (e.key === '1') mode.value = 1
-  else if (e.key === '2') mode.value = 2
-  else if (e.key === '3') mode.value = 3
+  } else if (e.key === '1') singleKind.value = 'trade'
+  else if (e.key === '2') singleKind.value = 'raw'
+  else if (e.key === '3') singleKind.value = 'review'
   else if (e.key === ' ') {
     e.preventDefault()
     cycleKind()
@@ -184,8 +181,7 @@ const realStatus = computed(() =>
 )
 const empty = computed(() => !curMarket.value || !curDate.value)
 
-const modeLabel = (m: 1 | 2 | 3) =>
-  m === 1 ? '單圖' : m === 2 ? '原圖 + 復盤圖' : '復盤圖 + 交易圖'
+const KIND_KEY: Record<ImageKind, string> = { trade: '1', raw: '2', review: '3' }
 const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ? '原圖' : '復盤圖')
 </script>
 
@@ -258,28 +254,17 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
       </div>
     </div>
 
-    <!-- 模式列 -->
-    <div class="flex items-center gap-2 px-6 py-3">
+    <!-- 圖種切換 -->
+    <div class="flex items-center gap-1.5 px-6 py-3">
       <UButton
-        v-for="m in [1, 2, 3] as const"
-        :key="m"
+        v-for="k in KIND_ORDER"
+        :key="k"
         size="xs"
-        :color="mode === m ? 'primary' : 'neutral'"
-        :variant="mode === m ? 'subtle' : 'outline'"
-        @click="mode = m"
-        >{{ m }}　{{ modeLabel(m) }}</UButton
+        :color="singleKind === k ? 'primary' : 'neutral'"
+        :variant="singleKind === k ? 'solid' : 'outline'"
+        @click="singleKind = k"
+        >{{ KIND_KEY[k] }}　{{ kindLabel(k) }}</UButton
       >
-      <div v-if="mode === 1" class="flex gap-1.5 ml-4">
-        <UButton
-          v-for="k in KIND_ORDER"
-          :key="k"
-          size="xs"
-          :color="singleKind === k ? 'primary' : 'neutral'"
-          :variant="singleKind === k ? 'solid' : 'outline'"
-          @click="singleKind = k"
-          >{{ kindLabel(k) }}</UButton
-        >
-      </div>
     </div>
 
     <!-- 舞台 -->
@@ -287,13 +272,13 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
       <div v-if="empty" class="flex items-center justify-center h-full">
         <p class="text-dimmed">本週尚無記錄。用上週/下週、日曆或先到「記錄」頁新增。</p>
       </div>
-      <ViewerStage v-else :images="slots" :mode="mode" :single-kind="singleKind" />
+      <ViewerStage v-else :images="slots" :single-kind="singleKind" />
     </div>
 
     <!-- 提示列 -->
     <div class="px-6 py-2 border-t border-default">
       <span class="text-xs text-dimmed"
-        >←→ 換日期 · Ctrl/⌘ + ←→ 換週 · ↑↓ 換市場 · Ctrl/⌘ + ↑↓ 切頁面 · 1/2/3 切模式 · Space 單圖循環三圖</span
+        >←→ 換日期 · Ctrl/⌘ + ←→ 換週 · ↑↓ 換市場 · Ctrl/⌘ + ↑↓ 切頁面 · 1/2/3 切交易圖/原圖/復盤圖 · Space 循環 · 點圖放大</span
       >
     </div>
   </div>
