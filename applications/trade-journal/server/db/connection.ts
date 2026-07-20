@@ -27,6 +27,18 @@ export function openDb(source?: string): Db {
   db.pragma('foreign_keys = ON')
   db.exec(SCHEMA)
 
+  // 附加式 migration（冪等）：補上既有 DB 缺少的新欄位，不動既有資料
+  const existing = new Set(
+    (db.pragma('table_info(entry)') as { name: string }[]).map((r) => r.name),
+  )
+  const addColumn = (name: string, ddl: string) => {
+    if (!existing.has(name)) db.exec(`ALTER TABLE entry ADD COLUMN ${ddl}`)
+  }
+  addColumn('would_w', 'would_w INTEGER')
+  addColumn('would_l', 'would_l INTEGER')
+  addColumn('would_t', 'would_t INTEGER')
+  addColumn('no_trade', 'no_trade INTEGER NOT NULL DEFAULT 0')
+
   const prepare = (sql: string): Stmt => {
     const st = db.prepare(sql)
     return {

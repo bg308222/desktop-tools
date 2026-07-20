@@ -9,6 +9,8 @@ function entry(partial: Partial<Entry>): Entry {
     tradeDate: '2026-07-14',
     actual: null,
     ideal: null,
+    would: null,
+    noTrade: false,
     noteJson: null,
     createdAt: '',
     updatedAt: '',
@@ -41,5 +43,14 @@ describe('deriveStatus', () => {
   it('三圖齊但缺理想 WLT → recorded', () => {
     const e = entry({ actual: { w: 2, l: 1, t: 0 } })
     expect(deriveStatus(e, { trade: true, raw: true, review: true })).toBe('recorded')
+  })
+
+  it('空手：未復盤 → notrade', () => {
+    expect(deriveStatus(entry({ noTrade: true }), none)).toBe('notrade')
+  })
+
+  it('空手：原圖+復盤圖+理想 → notrade_reviewed', () => {
+    const e = entry({ noTrade: true, ideal: { w: 1, l: 0, t: 0 } })
+    expect(deriveStatus(e, { trade: false, raw: true, review: true })).toBe('notrade_reviewed')
   })
 })

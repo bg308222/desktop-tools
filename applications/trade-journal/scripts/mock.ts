@@ -221,12 +221,30 @@ function run() {
 
   let entryCount = 0
   let imageCount = 0
+  let noTradeCount = 0
   for (const date of days) {
     for (const m of activeMarkets) {
       if (!chance(0.65)) continue
       const e = entries.upsert({ marketId: m.id, tradeDate: date })
       entryCount++
       const caption = `${m.name} ${dayjs(date).format('M/D')}`
+
+      // 約 15% 為空手日（兩種：沒機會 / 臨時有事）
+      if (chance(0.15)) {
+        entries.setNoTrade(e.id, true)
+        noTradeCount++
+        if (chance(0.5)) {
+          // 臨時有事：其實有機會 → 保留原圖/復盤圖/理想 WLT，且會做 = 理想
+          putImage(e.id, 'raw', caption)
+          putImage(e.id, 'review', caption)
+          imageCount += 2
+          const ideal = randomWlt(2)
+          entries.setWlt(e.id, 'ideal', ideal)
+          entries.setWlt(e.id, 'would', ideal)
+        }
+        // 另一半「沒機會」：不放圖、理想/會做皆 0（不填）
+        continue
+      }
 
       // 交易圖 + 實際 WLT（一定有）
       putImage(e.id, 'trade', caption)
@@ -239,6 +257,8 @@ function run() {
         putImage(e.id, 'review', caption)
         imageCount += 2
         entries.setWlt(e.id, 'ideal', randomWlt(3))
+        // 一般日偶爾有一筆「會做但沒做成」
+        if (chance(0.25)) entries.setWlt(e.id, 'would', { w: 1, l: 0, t: 0 })
       }
 
       // 標籤 1~3 個
@@ -282,7 +302,7 @@ function run() {
   db.close()
   console.log(
     `✅ mock 完成：市場 ${marketRows.length}（活躍 ${activeMarkets.length}）、規則 ${allRules.length}、` +
-      `記錄 ${entryCount}、圖片 ${imageCount}、標籤 ${tagNames.length}\n   資料位置：${dataDir}`,
+      `記錄 ${entryCount}（其中空手 ${noTradeCount}）、圖片 ${imageCount}、標籤 ${tagNames.length}\n   資料位置：${dataDir}`,
   )
 }
 

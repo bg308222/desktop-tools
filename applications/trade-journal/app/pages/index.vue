@@ -79,6 +79,16 @@ async function setWlt(kind: 'actual' | 'ideal', v: Wlt) {
   await api.entries.setWlt(id, kind, v)
   if (entry.value) entry.value = { ...entry.value, [kind]: v }
 }
+async function setWould(v: Wlt) {
+  const id = await ensureEntry()
+  await api.entries.setWlt(id, 'would', v)
+  if (entry.value) entry.value = { ...entry.value, would: v }
+}
+async function toggleNoTrade(v: boolean) {
+  const id = await ensureEntry()
+  await api.entries.setNoTrade(id, v)
+  if (entry.value) entry.value = { ...entry.value, noTrade: v }
+}
 
 async function commitTags(names: string[]) {
   tagNames.value = names
@@ -219,7 +229,19 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
     <!-- 內容 -->
     <div class="flex-1 min-h-0 overflow-y-auto p-6">
       <div class="flex flex-col gap-4 max-w-[940px] mx-auto">
-        <section class="rounded-lg border border-default overflow-hidden">
+        <div class="flex items-center gap-3">
+          <USwitch
+            :model-value="entry?.noTrade ?? false"
+            label="空手（今日無交易）"
+            @update:model-value="toggleNoTrade"
+          />
+          <span class="text-xs text-dimmed">開啟後隱藏交易圖與實際 WLT，仍可復盤（原圖／復盤圖／理想 WLT）</span>
+        </div>
+
+        <section
+          v-if="!(entry?.noTrade)"
+          class="rounded-lg border border-default overflow-hidden"
+        >
           <div class="px-4 py-3 border-b border-default bg-elevated/40 font-semibold">交易</div>
           <div class="p-4 flex flex-col gap-4">
             <div class="max-w-[380px]">
@@ -266,6 +288,10 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
                 :model-value="entry?.ideal ?? null"
                 @update:model-value="(v) => setWlt('ideal', v)"
               />
+            </div>
+            <div class="flex gap-4 items-end">
+              <span class="text-xs uppercase text-dimmed w-16">會做 WLT</span>
+              <WltStepper :model-value="entry?.would ?? null" @update:model-value="setWould" />
             </div>
           </div>
         </section>

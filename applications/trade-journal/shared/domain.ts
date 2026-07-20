@@ -19,6 +19,8 @@ export interface Entry {
   tradeDate: string // YYYY-MM-DD
   actual: Wlt | null
   ideal: Wlt | null
+  would: Wlt | null // 會做（未執行）：本來會做、但因臨時有事沒做成
+  noTrade: boolean // 空手日（今日無交易）
   noteJson: string | null
   createdAt: string
   updatedAt: string
@@ -60,7 +62,7 @@ export interface RuleImage {
   sortOrder: number
 }
 
-export type EntryStatus = 'empty' | 'recorded' | 'reviewed'
+export type EntryStatus = 'empty' | 'recorded' | 'reviewed' | 'notrade' | 'notrade_reviewed'
 
 export interface ImagePresence {
   trade: boolean

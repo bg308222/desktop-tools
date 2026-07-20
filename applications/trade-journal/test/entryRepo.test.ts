@@ -46,4 +46,26 @@ describe('entryRepo', () => {
     const dates = entries.listByMarketInRange(marketId, '2026-07-13', '2026-07-17').map((e) => e.tradeDate)
     expect(dates).toEqual(['2026-07-14', '2026-07-15', '2026-07-16'])
   })
+
+  it('setWlt would 與 setNoTrade、映射正確', async () => {
+    const { entries, marketId } = await setup()
+    const e = entries.upsert({ marketId, tradeDate: '2026-07-14' })
+    entries.setWlt(e.id, 'would', { w: 1, l: 0, t: 0 })
+    entries.setNoTrade(e.id, true)
+    const got = entries.getById(e.id)!
+    expect(got.would).toEqual({ w: 1, l: 0, t: 0 })
+    expect(got.noTrade).toBe(true)
+  })
+
+  it('upsert 可帶 noTrade 與 would', async () => {
+    const { entries, marketId } = await setup()
+    const e = entries.upsert({
+      marketId,
+      tradeDate: '2026-07-15',
+      noTrade: true,
+      would: { w: 2, l: 0, t: 0 },
+    })
+    expect(e.noTrade).toBe(true)
+    expect(e.would).toEqual({ w: 2, l: 0, t: 0 })
+  })
 })
