@@ -1,5 +1,7 @@
 # trade-journal — app 專屬指令
 
+set dotenv-load := true
+
 # 起前後端（Nuxt dev server）
 dev:
     bun install
@@ -14,6 +16,15 @@ bump type="patch":
 # build docker image trade-journal:<version>
 build:
     docker build -t trade-journal:$(node -p "require('./package.json').version") .
+
+# 產生整套 demo 假資料（會先清空既有資料）；以 tsx 在 Node 下執行
+mock:
+    ./node_modules/.bin/tsx scripts/mock.ts
+
+# 清空該 app 所有資料（DATA_DIR；不動 build 產物與 node_modules）
+clean:
+    rm -rf "${DATA_DIR:-data}"
+    @echo "🧹 已清空資料：${DATA_DIR:-data}"
 
 # 測試 / 型別檢查
 test:

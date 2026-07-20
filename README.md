@@ -19,7 +19,11 @@ just                      # 列出指令
 just dev trade-journal    # 起前後端（Nuxt dev）
 just bump trade-journal   # 版本 patch +1 並 commit
 just build trade-journal  # build docker image
+just mock trade-journal   # 產生整套 demo 假資料（會先清空既有資料）
+just clean trade-journal  # 清空該 app 所有資料（DATA_DIR；不動 build 產物與 node_modules）
 ```
+
+> `mock` 用於想直接體驗前端操作時：依該 app 情況產出夠真實的示範資料（trade-journal 會生成市場、規則、數週交易記錄與 SVG K 線圖）。各 app 自帶 `scripts/mock.ts`。
 
 ## 資料與部署
 
