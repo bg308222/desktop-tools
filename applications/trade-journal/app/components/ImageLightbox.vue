@@ -85,17 +85,24 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === '0') reset()
 }
 
+const overlay = useOverlayGuard()
 watch(
   () => props.open,
-  (o) => {
+  (o, prev) => {
     if (o) {
       idx.value = props.start ?? 0
       reset()
+      overlay.open()
+    } else if (prev) {
+      overlay.close()
     }
   },
 )
 onMounted(() => window.addEventListener('keydown', onKey))
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  if (props.open) overlay.close() // 開著時被卸載也要還原計數
+})
 </script>
 
 <template>

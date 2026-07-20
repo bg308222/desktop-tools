@@ -116,7 +116,9 @@ function moveMarket(dir: 1 | -1) {
   curMarket.value = order[(i + dir + order.length) % order.length] ?? null
 }
 
+const overlay = useOverlayGuard()
 function onKey(e: KeyboardEvent) {
+  if (overlay.isOpen.value) return // lightbox 開著時讓路
   const el = document.activeElement
   if (
     el &&

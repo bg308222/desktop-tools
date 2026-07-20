@@ -139,7 +139,9 @@ const weekLabel = computed(
   () => `${dayjs(weekStart.value).format('M/D')} – ${dayjs(weekStart.value).add(4, 'day').format('M/D')}`,
 )
 
+const overlay = useOverlayGuard()
 function onKey(e: KeyboardEvent) {
+  if (overlay.isOpen.value) return // lightbox 開著時讓路
   const el = document.activeElement
   if (
     el &&

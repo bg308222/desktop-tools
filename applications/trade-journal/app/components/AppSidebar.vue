@@ -16,7 +16,9 @@ function toggleTheme() {
 }
 
 // Ctrl/⌘ + ↑/↓ 切換選單頁面（循環）
+const overlay = useOverlayGuard()
 function onKey(e: KeyboardEvent) {
+  if (overlay.isOpen.value) return // lightbox / 燈箱開著時讓路
   if (!(e.ctrlKey || e.metaKey)) return
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
   const el = document.activeElement

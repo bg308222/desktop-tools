@@ -55,8 +55,16 @@ function onKey(e: KeyboardEvent) {
         present[(present.indexOf(singleKind.value) + 1) % present.length] ?? present[0]!
   }
 }
+const overlay = useOverlayGuard()
+watch(open, (o, prev) => {
+  if (o) overlay.open()
+  else if (prev) overlay.close()
+})
 onMounted(() => window.addEventListener('keydown', onKey))
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  if (open.value) overlay.close()
+})
 
 const title = computed(() =>
   entry.value ? `${props.marketName(entry.value.marketId)} · ${entry.value.tradeDate}` : '',
