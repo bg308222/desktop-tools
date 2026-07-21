@@ -10,6 +10,7 @@ const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 const wd = (d: string | dayjs.Dayjs) => '週' + WEEKDAY[dayjs(d).day()]
 
+const loaded = ref(false)
 const markets = ref<Market[]>([])
 const allTags = ref<Tag[]>([])
 const curMarket = ref<string | null>(null)
@@ -29,6 +30,7 @@ onMounted(async () => {
       ? savedM
       : (ms.find((m) => !m.archived)?.id ?? ms[0]?.id ?? null)
   allTags.value = await api.tags.list()
+  loaded.value = true
 })
 
 // 同一 session 內記住市場 / 日期（重整會重置）
@@ -175,7 +177,11 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
 </script>
 
 <template>
-  <div v-if="markets.length === 0" class="flex items-center justify-center h-screen">
+  <div v-if="!loaded" class="flex items-center justify-center h-screen">
+    <p class="text-dimmed">載入中…</p>
+  </div>
+
+  <div v-else-if="markets.length === 0" class="flex items-center justify-center h-screen">
     <p class="text-dimmed">尚無市場。請先到「設定」新增市場。</p>
   </div>
 
