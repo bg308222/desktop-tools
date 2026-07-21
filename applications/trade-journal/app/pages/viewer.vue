@@ -277,49 +277,50 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
       </div>
     </div>
 
-    <!-- 圖種切換 -->
-    <div class="flex items-center gap-1.5 px-6 py-3">
-      <UButton
-        v-for="k in KIND_ORDER"
-        :key="k"
-        size="xs"
-        :color="singleKind === k ? 'primary' : 'neutral'"
-        :variant="singleKind === k ? 'solid' : 'outline'"
-        @click="singleKind = k"
-        >{{ KIND_KEY[k] }}　{{ kindLabel(k) }}</UButton
-      >
+    <!-- 圖種切換 + 標籤（同一列，明顯可見） -->
+    <div class="flex items-center gap-3 px-6 py-3 border-b border-default flex-wrap">
+      <div class="flex items-center gap-1.5">
+        <UButton
+          v-for="k in KIND_ORDER"
+          :key="k"
+          size="xs"
+          :color="singleKind === k ? 'primary' : 'neutral'"
+          :variant="singleKind === k ? 'solid' : 'outline'"
+          @click="singleKind = k"
+          >{{ KIND_KEY[k] }}　{{ kindLabel(k) }}</UButton
+        >
+      </div>
+
+      <div v-if="!empty" class="flex items-center gap-2 flex-wrap pl-3 border-l border-default">
+        <span class="text-xs font-medium text-dimmed shrink-0">標籤</span>
+        <UBadge
+          v-for="n in tagNames"
+          :key="n"
+          color="primary"
+          variant="subtle"
+          class="cursor-pointer"
+          @click="removeTag(n)"
+          >{{ n }} ✕</UBadge
+        >
+        <input
+          v-model="tagDraft"
+          list="viewer-tag-suggestions"
+          placeholder="＋ 上標籤（Enter）"
+          class="rounded-md border border-default bg-default px-2 py-1 text-sm w-[180px]"
+          @keydown.enter.prevent="addTag"
+        />
+        <datalist id="viewer-tag-suggestions">
+          <option v-for="t in allTags" :key="t.id" :value="t.name" />
+        </datalist>
+      </div>
     </div>
 
     <!-- 舞台 -->
-    <div class="flex-1 min-h-0 px-6 pb-6">
+    <div class="flex-1 min-h-0 px-6 py-4">
       <div v-if="empty" class="flex items-center justify-center h-full">
         <p class="text-dimmed">本週尚無記錄。用上週/下週、日曆或先到「記錄」頁新增。</p>
       </div>
       <ViewerStage v-else :images="slots" :single-kind="singleKind" />
-    </div>
-
-    <!-- 標籤（復盤時上標籤，此處最仔細看圖） -->
-    <div v-if="!empty" class="flex items-center gap-2 flex-wrap px-6 pb-3">
-      <span class="text-xs uppercase text-dimmed shrink-0">標籤</span>
-      <UBadge
-        v-for="n in tagNames"
-        :key="n"
-        color="primary"
-        variant="subtle"
-        class="cursor-pointer"
-        @click="removeTag(n)"
-        >{{ n }} ✕</UBadge
-      >
-      <input
-        v-model="tagDraft"
-        list="viewer-tag-suggestions"
-        placeholder="輸入後 Enter 上標籤"
-        class="rounded-md border border-default bg-default px-2 py-1 text-sm min-w-[160px]"
-        @keydown.enter.prevent="addTag"
-      />
-      <datalist id="viewer-tag-suggestions">
-        <option v-for="t in allTags" :key="t.id" :value="t.name" />
-      </datalist>
     </div>
 
     <!-- 提示列 -->
