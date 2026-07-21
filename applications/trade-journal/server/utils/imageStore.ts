@@ -35,8 +35,8 @@ export function createImageStore(root: string) {
       write(rel, buffer)
       return { filePath: rel, ...dims(buffer) }
     },
-    writeRuleImage(ruleId: string, buffer: Buffer, ext: string): WrittenImage {
-      const rel = path.join('images', 'rules', ruleId, `${randomUUID()}.${ext}`)
+    writeTagImage(tagId: string, buffer: Buffer, ext: string): WrittenImage {
+      const rel = path.join('images', 'tags', tagId, `${randomUUID()}.${ext}`)
       write(rel, buffer)
       return { filePath: rel, ...dims(buffer) }
     },

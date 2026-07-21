@@ -30,4 +30,24 @@ describe('tagRepo', () => {
     tags.setEntryTags(entryId, [t3.id])
     expect(tags.getEntryTags(entryId).map((t) => t.name)).toEqual(['假突破'])
   })
+
+  it('setBody 與 list/getEntryTags 帶出 body', async () => {
+    const { tags, entryId } = await setup()
+    const t = tags.ensure('只在區間邊緣進場')
+    expect(t.body).toBeNull()
+    tags.setBody(t.id, '觸及區間上下緣才進場。')
+    expect(tags.list()[0]!.body).toBe('觸及區間上下緣才進場。')
+    tags.setEntryTags(entryId, [t.id])
+    expect(tags.getEntryTags(entryId)[0]!.body).toBe('觸及區間上下緣才進場。')
+  })
+
+  it('addImage / listImages / removeImage', async () => {
+    const { tags } = await setup()
+    const t = tags.ensure('突破')
+    const img = tags.addImage(t.id, 'images/tags/x/a.png')
+    expect(tags.listImages(t.id)).toHaveLength(1)
+    expect(img.tagId).toBe(t.id)
+    tags.removeImage(img.id)
+    expect(tags.listImages(t.id)).toHaveLength(0)
+  })
 })

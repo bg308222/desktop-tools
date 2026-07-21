@@ -4,7 +4,6 @@ import { createEntryRepo } from '../db/repositories/entryRepo'
 import { createImageRepo } from '../db/repositories/imageRepo'
 import { createMarketRepo } from '../db/repositories/marketRepo'
 import { createTagRepo } from '../db/repositories/tagRepo'
-import { createRuleRepo } from '../db/repositories/ruleRepo'
 import { createImageStore } from './imageStore'
 
 let cached: ReturnType<typeof build> | null = null
@@ -19,7 +18,6 @@ function build() {
     entries: createEntryRepo(db),
     images: createImageRepo(db),
     tags: createTagRepo(db),
-    rules: createRuleRepo(db),
     store: createImageStore(dataDir),
   }
 }
@@ -28,4 +26,10 @@ function build() {
 export function useRepos() {
   if (!cached) cached = build()
   return cached
+}
+
+/** 重置單例（匯入資料後呼叫）：關閉並清掉快取，下次請求重開讀新資料。 */
+export function resetRepos(): void {
+  cached?.db.close()
+  cached = null
 }

@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS tag (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL UNIQUE,
   color       TEXT,
+  body        TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -51,33 +52,10 @@ CREATE TABLE IF NOT EXISTS entry_tag (
   PRIMARY KEY (entry_id, tag_id)
 );
 
-CREATE TABLE IF NOT EXISTS rule_group (
+CREATE TABLE IF NOT EXISTS tag_image (
   id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS rule (
-  id          TEXT PRIMARY KEY,
-  group_id    TEXT NOT NULL REFERENCES rule_group(id) ON DELETE CASCADE,
-  name        TEXT NOT NULL,
-  body_json   TEXT,
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS rule_image (
-  id          TEXT PRIMARY KEY,
-  rule_id     TEXT NOT NULL REFERENCES rule(id) ON DELETE CASCADE,
+  tag_id      TEXT NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
   file_path   TEXT NOT NULL,
   sort_order  INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS entry_rule_ref (
-  entry_id    TEXT NOT NULL REFERENCES entry(id) ON DELETE CASCADE,
-  rule_id     TEXT NOT NULL REFERENCES rule(id) ON DELETE CASCADE,
-  PRIMARY KEY (entry_id, rule_id)
 );
 `

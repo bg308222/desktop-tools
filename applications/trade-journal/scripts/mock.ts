@@ -13,9 +13,7 @@ import { createMarketRepo } from '../server/db/repositories/marketRepo'
 import { createEntryRepo } from '../server/db/repositories/entryRepo'
 import { createImageRepo } from '../server/db/repositories/imageRepo'
 import { createTagRepo } from '../server/db/repositories/tagRepo'
-import { createRuleRepo } from '../server/db/repositories/ruleRepo'
 import { createImageStore } from '../server/utils/imageStore'
-import { extractRuleIds } from '../shared/mention'
 import type { ImageKind, Wlt } from '../shared/domain'
 
 const dataDir = process.env.DATA_DIR || './data'
@@ -137,7 +135,6 @@ function run() {
   const entries = createEntryRepo(db)
   const images = createImageRepo(db)
   const tags = createTagRepo(db)
-  const rules = createRuleRepo(db)
   const store = createImageStore(dataDir)
 
   // 市場（歐元設為退役，示範封存狀態）
@@ -155,52 +152,29 @@ function run() {
   })
   const activeMarkets = marketRows.filter((m) => !m.archived)
 
-  // 標籤
-  const tagNames = ['順勢', '突破', '假突破', '追高殺低', '情緒交易', '完美執行', '提前出場', '嚴守紀律']
-  tagNames.forEach((n) => tags.ensure(n))
-
-  // 交易規則（群組 + 規則，部分帶內文與附圖）
-  const groupDefs: { name: string; rules: { name: string; body?: string }[] }[] = [
-    {
-      name: '進場條件',
-      rules: [
-        { name: '只在區間邊緣進場', body: '價格觸及區間上下緣且出現反轉訊號才進場，區間中央一律不做。' },
-        { name: '等待回測確認', body: '突破後等待回測不破再進，避免假突破。' },
-        { name: '突破需帶量' },
-      ],
-    },
-    {
-      name: '出場條件',
-      rules: [
-        { name: '觸及停損立即出場', body: '停損是紀律，觸價無條件執行，不凹單。' },
-        { name: '獲利先出一半' },
-        { name: '時間到未達目標則平倉' },
-      ],
-    },
-    {
-      name: '心態紀律',
-      rules: [
-        { name: '單日虧損上限三筆', body: '單日連續虧損三筆即停止當日交易。' },
-        { name: '不追高殺低' },
-        { name: '情緒波動時停止交易' },
-      ],
-    },
+  // 標籤（部分帶內文＝原「規則」定義；其中一個帶示範附圖）
+  const tagDefs: { name: string; color?: string; body?: string; image?: boolean }[] = [
+    { name: '只在區間邊緣進場', color: '#22c55e', body: '價格觸及區間上下緣且出現反轉訊號才進場，區間中央一律不做。', image: true },
+    { name: '等待回測確認', color: '#22c55e', body: '突破後等待回測不破再進，避免假突破。' },
+    { name: '觸及停損立即出場', color: '#ef4444', body: '停損是紀律，觸價無條件執行，不凹單。' },
+    { name: '單日虧損上限三筆', color: '#f59e0b', body: '單日連續虧損三筆即停止當日交易。' },
+    { name: '順勢' },
+    { name: '突破' },
+    { name: '假突破' },
+    { name: '追高殺低', color: '#ef4444' },
+    { name: '情緒交易', color: '#ef4444' },
+    { name: '完美執行', color: '#22c55e' },
   ]
-  const allRules: { id: string; name: string }[] = []
-  for (const g of groupDefs) {
-    const group = rules.createGroup(g.name)
-    for (const rDef of g.rules) {
-      const rule = rules.createRule(group.id, rDef.name)
-      if (rDef.body) rules.updateRule(rule.id, { bodyJson: rDef.body })
-      allRules.push({ id: rule.id, name: rule.name })
+  const tagNames = tagDefs.map((t) => t.name)
+  for (const def of tagDefs) {
+    const t = tags.ensure(def.name)
+    if (def.color) tags.setColor(t.id, def.color)
+    if (def.body) tags.setBody(t.id, def.body)
+    if (def.image) {
+      const svg = candlesSvg(hash('tag-' + t.id), 'review', def.name)
+      const w = store.writeTagImage(t.id, Buffer.from(svg), 'svg')
+      tags.addImage(t.id, w.filePath)
     }
-  }
-  // 給第一條規則加一張附圖
-  {
-    const rule = allRules[0]!
-    const svg = candlesSvg(hash('rule-' + rule.id), 'review', rule.name)
-    const w = store.writeRuleImage(rule.id, Buffer.from(svg), 'svg')
-    rules.addRuleImage(rule.id, w.filePath)
   }
 
   // 記錄：過去約 4 週的工作日 × 各活躍市場
@@ -268,40 +242,16 @@ function run() {
       const tagIds = [...picked].map((n) => tags.ensure(n).id)
       tags.setEntryTags(e.id, tagIds)
 
-      // 約 55% 有備註，其中部分引用規則（帶 mention）
+      // 約 55% 有備註（純文字）
       if (chance(0.55)) {
-        const phrase = pick(notePhrases)
-        let noteJson: string
-        if (chance(0.6)) {
-          const rule = pick(allRules)
-          noteJson = JSON.stringify({
-            type: 'doc',
-            content: [
-              {
-                type: 'paragraph',
-                content: [
-                  { type: 'text', text: '今日依 ' },
-                  { type: 'mention', attrs: { id: rule.id, label: rule.name } },
-                  { type: 'text', text: ` 操作，${phrase}` },
-                ],
-              },
-            ],
-          })
-        } else {
-          noteJson = JSON.stringify({
-            type: 'doc',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: phrase }] }],
-          })
-        }
-        entries.setNote(e.id, noteJson)
-        rules.setEntryRuleRefs(e.id, extractRuleIds(noteJson))
+        entries.setNote(e.id, pick(notePhrases))
       }
     }
   }
 
   db.close()
   console.log(
-    `✅ mock 完成：市場 ${marketRows.length}（活躍 ${activeMarkets.length}）、規則 ${allRules.length}、` +
+    `✅ mock 完成：市場 ${marketRows.length}（活躍 ${activeMarkets.length}）、` +
       `記錄 ${entryCount}（其中空手 ${noTradeCount}）、圖片 ${imageCount}、標籤 ${tagNames.length}\n   資料位置：${dataDir}`,
   )
 }

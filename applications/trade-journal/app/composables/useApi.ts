@@ -1,14 +1,4 @@
-import type {
-  Market,
-  Entry,
-  ImageRec,
-  ImageKind,
-  Tag,
-  RuleGroup,
-  Rule,
-  RuleImage,
-  Wlt,
-} from '../../shared/domain'
+import type { Market, Entry, ImageRec, ImageKind, Tag, TagImage, Wlt } from '../../shared/domain'
 
 export interface EntryUpsertInput {
   marketId: string
@@ -79,8 +69,8 @@ export function useApi() {
         call(() => $fetch<ImageRec[]>('/api/images', { query: { entry: entryId } })),
       paste: (entryId: string, kind: ImageKind, dataUrl: string) =>
         call(() => $fetch<ImageRec>('/api/images', { method: 'POST', body: { entryId, kind, dataUrl } })),
-      pasteRuleImage: (ruleId: string, dataUrl: string) =>
-        call(() => $fetch<RuleImage>('/api/images', { method: 'POST', body: { ruleId, dataUrl } })),
+      pasteTagImage: (tagId: string, dataUrl: string) =>
+        call(() => $fetch<TagImage>('/api/images', { method: 'POST', body: { tagId, dataUrl } })),
       remove: (entryId: string, kind: ImageKind) =>
         call(() => $fetch('/api/images', { method: 'DELETE', query: q({ entry: entryId, kind }) })),
     },
@@ -88,31 +78,20 @@ export function useApi() {
       list: () => call(() => $fetch<Tag[]>('/api/tags')),
       ensure: (name: string) =>
         call(() => $fetch<Tag>('/api/tags', { method: 'POST', body: { name } })),
+      rename: (id: string, name: string) =>
+        call(() => $fetch(`/api/tags/${id}`, { method: 'PATCH', body: { name } })),
+      setColor: (id: string, color: string | null) =>
+        call(() => $fetch(`/api/tags/${id}`, { method: 'PATCH', body: { color } })),
+      setBody: (id: string, body: string | null) =>
+        call(() => $fetch(`/api/tags/${id}`, { method: 'PATCH', body: { body } })),
+      remove: (id: string) => call(() => $fetch(`/api/tags/${id}`, { method: 'DELETE' })),
+      listImages: (tagId: string) => call(() => $fetch<TagImage[]>(`/api/tags/${tagId}/images`)),
+      removeImage: (id: string) =>
+        call(() => $fetch(`/api/tag-images/${id}`, { method: 'DELETE' })),
       getEntryTags: (entryId: string) =>
         call(() => $fetch<Tag[]>('/api/tags/entry', { query: { entry: entryId } })),
       setEntryTags: (entryId: string, tagIds: string[]) =>
         call(() => $fetch('/api/tags/entry', { method: 'POST', body: { entryId, tagIds } })),
-    },
-    rules: {
-      listGroups: () => call(() => $fetch<RuleGroup[]>('/api/rule-groups')),
-      createGroup: (name: string) =>
-        call(() => $fetch<RuleGroup>('/api/rule-groups', { method: 'POST', body: { name } })),
-      reorderGroups: (ids: string[]) =>
-        call(() => $fetch('/api/rule-groups/reorder', { method: 'POST', body: { ids } })),
-      list: () => call(() => $fetch<Rule[]>('/api/rules')),
-      create: (groupId: string, name: string) =>
-        call(() => $fetch<Rule>('/api/rules', { method: 'POST', body: { groupId, name } })),
-      update: (id: string, patch: { name?: string; bodyJson?: string | null }) =>
-        call(() => $fetch(`/api/rules/${id}`, { method: 'PATCH', body: patch })),
-      move: (id: string, groupId: string) =>
-        call(() => $fetch(`/api/rules/${id}`, { method: 'PATCH', body: { groupId } })),
-      remove: (id: string) => call(() => $fetch(`/api/rules/${id}`, { method: 'DELETE' })),
-      listImages: (ruleId: string) =>
-        call(() => $fetch<RuleImage[]>(`/api/rules/${ruleId}/images`)),
-      removeImage: (id: string) =>
-        call(() => $fetch(`/api/rule-images/${id}`, { method: 'DELETE' })),
-      entriesReferencing: (ruleId: string) =>
-        call(() => $fetch<string[]>(`/api/rules/${ruleId}/references`)),
     },
     app: {
       dataFolder: () =>

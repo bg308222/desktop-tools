@@ -28,16 +28,24 @@ export function openDb(source?: string): Db {
   db.exec(SCHEMA)
 
   // 附加式 migration（冪等）：補上既有 DB 缺少的新欄位，不動既有資料
-  const existing = new Set(
-    (db.pragma('table_info(entry)') as { name: string }[]).map((r) => r.name),
-  )
-  const addColumn = (name: string, ddl: string) => {
-    if (!existing.has(name)) db.exec(`ALTER TABLE entry ADD COLUMN ${ddl}`)
+  const cols = (table: string) =>
+    new Set((db.pragma(`table_info(${table})`) as { name: string }[]).map((r) => r.name))
+  const entryCols = cols('entry')
+  const addEntryCol = (name: string, ddl: string) => {
+    if (!entryCols.has(name)) db.exec(`ALTER TABLE entry ADD COLUMN ${ddl}`)
   }
-  addColumn('would_w', 'would_w INTEGER')
-  addColumn('would_l', 'would_l INTEGER')
-  addColumn('would_t', 'would_t INTEGER')
-  addColumn('no_trade', 'no_trade INTEGER NOT NULL DEFAULT 0')
+  addEntryCol('would_w', 'would_w INTEGER')
+  addEntryCol('would_l', 'would_l INTEGER')
+  addEntryCol('would_t', 'would_t INTEGER')
+  addEntryCol('no_trade', 'no_trade INTEGER NOT NULL DEFAULT 0')
+
+  // tag 長出內文欄位
+  if (!cols('tag').has('body')) db.exec(`ALTER TABLE tag ADD COLUMN body TEXT`)
+
+  // rules 併入 tags：移除已淘汰的 rule 相關表（先子後親，冪等）
+  for (const t of ['entry_rule_ref', 'rule_image', 'rule', 'rule_group']) {
+    db.exec(`DROP TABLE IF EXISTS ${t}`)
+  }
 
   const prepare = (sql: string): Stmt => {
     const st = db.prepare(sql)

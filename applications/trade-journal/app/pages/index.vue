@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { Entry, ImageKind, Market, Rule, Tag, Wlt } from '../../shared/domain'
+import type { Entry, ImageKind, Market, Tag, Wlt } from '../../shared/domain'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
 
@@ -12,7 +12,6 @@ const wd = (d: string | dayjs.Dayjs) => '週' + WEEKDAY[dayjs(d).day()]
 
 const markets = ref<Market[]>([])
 const allTags = ref<Tag[]>([])
-const rules = ref<Rule[]>([])
 const curMarket = ref<string | null>(null)
 const curDate = ref<string>(session.record.date ?? dayjs().format('YYYY-MM-DD'))
 
@@ -30,7 +29,6 @@ onMounted(async () => {
       ? savedM
       : (ms.find((m) => !m.archived)?.id ?? ms[0]?.id ?? null)
   allTags.value = await api.tags.list()
-  rules.value = await api.rules.list()
 })
 
 // 同一 session 內記住市場 / 日期（重整會重置）
@@ -325,14 +323,14 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
             </div>
             <div>
               <label class="block text-xs uppercase text-dimmed mb-1.5">備註</label>
-              <ClientOnly>
-                <NoteEditor
-                  :key="noteKey"
-                  :model-value="entry?.noteJson ?? null"
-                  :rules="rules"
-                  @update:model-value="changeNote"
-                />
-              </ClientOnly>
+              <textarea
+                :key="noteKey"
+                :value="entry?.noteJson ?? ''"
+                rows="4"
+                placeholder="今日備註…"
+                class="w-full rounded-md border border-default bg-default px-3 py-2 text-sm leading-relaxed"
+                @input="changeNote(($event.target as HTMLTextAreaElement).value)"
+              />
             </div>
           </div>
         </section>

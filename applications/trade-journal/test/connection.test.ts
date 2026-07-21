@@ -5,20 +5,10 @@ import path from 'node:path'
 import Database from 'better-sqlite3'
 import { openDb } from '../server/db/connection'
 
-const TABLES = [
-  'market',
-  'entry',
-  'image',
-  'tag',
-  'entry_tag',
-  'rule_group',
-  'rule',
-  'rule_image',
-  'entry_rule_ref',
-]
+const TABLES = ['market', 'entry', 'image', 'tag', 'entry_tag', 'tag_image']
 
 describe('openDb', () => {
-  it('建立全部九張資料表', async () => {
+  it('建立全部資料表', async () => {
     const db = await openDb(':memory:')
     const rows = db
       .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
@@ -34,6 +24,23 @@ describe('openDb', () => {
     const db = await openDb(':memory:')
     const r = db.prepare('PRAGMA foreign_keys').get<{ foreign_keys: number }>()
     expect(r?.foreign_keys).toBe(1)
+    db.close()
+  })
+
+  it('tag 具備 body、tag_image 存在、rule 相關表已移除', async () => {
+    const db = await openDb(':memory:')
+    const tagCols = db
+      .prepare(`SELECT name FROM pragma_table_info('tag')`)
+      .all<{ name: string }>()
+      .map((r) => r.name)
+    expect(tagCols).toContain('body')
+    const tables = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
+      .all<{ name: string }>()
+      .map((r) => r.name)
+    expect(tables).toContain('tag_image')
+    for (const t of ['rule', 'rule_group', 'rule_image', 'entry_rule_ref'])
+      expect(tables).not.toContain(t)
     db.close()
   })
 

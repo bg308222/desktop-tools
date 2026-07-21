@@ -5,14 +5,14 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<{
     entryId?: string
     kind?: ImageKind
-    ruleId?: string
+    tagId?: string
     dataUrl: string
   }>(event)
-  const { images, rules, store } = useRepos()
+  const { images, tags, store } = useRepos()
   const { ext, buffer } = parseDataUrl(body.dataUrl)
-  if (body.ruleId) {
-    const w = store.writeRuleImage(body.ruleId, buffer, ext)
-    return rules.addRuleImage(body.ruleId, w.filePath)
+  if (body.tagId) {
+    const w = store.writeTagImage(body.tagId, buffer, ext)
+    return tags.addImage(body.tagId, w.filePath)
   }
   if (body.entryId && body.kind) {
     const w = store.writeEntryImage(body.entryId, body.kind, buffer, ext)

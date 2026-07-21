@@ -39,25 +39,12 @@ export interface Tag {
   id: string
   name: string
   color: string | null
+  body: string | null // 內文/定義（原「規則」內文）
 }
 
-export interface RuleGroup {
+export interface TagImage {
   id: string
-  name: string
-  sortOrder: number
-}
-
-export interface Rule {
-  id: string
-  groupId: string
-  name: string
-  bodyJson: string | null
-  sortOrder: number
-}
-
-export interface RuleImage {
-  id: string
-  ruleId: string
+  tagId: string
   filePath: string
   sortOrder: number
 }

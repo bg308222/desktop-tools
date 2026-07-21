@@ -3,7 +3,7 @@ const items = [
   { to: '/', label: '記錄', icon: '📝' },
   { to: '/viewer', label: '復盤', icon: '🔍' },
   { to: '/tags', label: '標籤', icon: '🏷' },
-  { to: '/rules', label: '交易規則', icon: '📐' },
+  { to: '/manage', label: '標籤管理', icon: '📐' },
   { to: '/settings', label: '設定', icon: '⚙' },
 ]
 
