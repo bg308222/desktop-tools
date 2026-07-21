@@ -32,6 +32,9 @@ const curDate = ref<string | null>(session.viewer.date)
 const singleKind = ref<ImageKind>(session.viewer.singleKind)
 const slots = ref<SlotPaths>({ ...EMPTY })
 const allDates = ref<Set<string>>(new Set())
+const allTags = ref<{ id: string; name: string }[]>([])
+const tagNames = ref<string[]>([])
+const tagDraft = ref('')
 
 const weekDates = computed(() =>
   Array.from({ length: 5 }, (_, i) => dayjs(weekStart.value).add(i, 'day').format('YYYY-MM-DD')),
@@ -42,6 +45,7 @@ const marketName = (id: string | null) => markets.value.find((m) => m.id === id)
 onMounted(async () => {
   markets.value = await api.markets.list()
   allDates.value = new Set(await api.entries.dates())
+  allTags.value = await api.tags.list()
 })
 
 watch(
@@ -80,12 +84,31 @@ watch(
   curEntry,
   async (e) => {
     slots.value = e ? toSlotPaths(await api.images.getByEntry(e.id)) : { ...EMPTY }
+    tagNames.value = e ? (await api.tags.getEntryTags(e.id)).map((t) => t.name) : []
     // 空手日常無交易圖：單圖模式預設落在有圖的 kind，避免空白
     const present = KIND_ORDER.filter((k) => slots.value[k])
     if (present.length && !slots.value[singleKind.value]) singleKind.value = present[0]!
   },
   { immediate: true },
 )
+
+// 復盤時上標籤（此處最仔細看圖）
+async function commitTags(names: string[]) {
+  const e = curEntry.value
+  if (!e) return
+  tagNames.value = names
+  const ids = await Promise.all(names.map((n) => api.tags.ensure(n).then((t) => t.id)))
+  await api.tags.setEntryTags(e.id, ids)
+  allTags.value = await api.tags.list()
+}
+function addTag() {
+  const n = tagDraft.value.trim()
+  tagDraft.value = ''
+  if (n && !tagNames.value.includes(n)) void commitTags([...tagNames.value, n])
+}
+function removeTag(n: string) {
+  void commitTags(tagNames.value.filter((t) => t !== n))
+}
 
 // 同一 session 內記住瀏覽狀態（重整會重置）
 watch([weekStart, curMarket, curDate, singleKind], () => {
@@ -273,6 +296,30 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
         <p class="text-dimmed">本週尚無記錄。用上週/下週、日曆或先到「記錄」頁新增。</p>
       </div>
       <ViewerStage v-else :images="slots" :single-kind="singleKind" />
+    </div>
+
+    <!-- 標籤（復盤時上標籤，此處最仔細看圖） -->
+    <div v-if="!empty" class="flex items-center gap-2 flex-wrap px-6 pb-3">
+      <span class="text-xs uppercase text-dimmed shrink-0">標籤</span>
+      <UBadge
+        v-for="n in tagNames"
+        :key="n"
+        color="primary"
+        variant="subtle"
+        class="cursor-pointer"
+        @click="removeTag(n)"
+        >{{ n }} ✕</UBadge
+      >
+      <input
+        v-model="tagDraft"
+        list="viewer-tag-suggestions"
+        placeholder="輸入後 Enter 上標籤"
+        class="rounded-md border border-default bg-default px-2 py-1 text-sm min-w-[160px]"
+        @keydown.enter.prevent="addTag"
+      />
+      <datalist id="viewer-tag-suggestions">
+        <option v-for="t in allTags" :key="t.id" :value="t.name" />
+      </datalist>
     </div>
 
     <!-- 提示列 -->
