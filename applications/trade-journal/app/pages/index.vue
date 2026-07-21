@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
+import { parseDate, type DateValue } from '@internationalized/date'
 import type { Entry, ImageKind, Market, Tag, Wlt } from '../../shared/domain'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
@@ -9,12 +10,19 @@ const session = useSession()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 const wd = (d: string | dayjs.Dayjs) => '週' + WEEKDAY[dayjs(d).day()]
+const isWeekend = (d: dayjs.Dayjs) => d.day() === 0 || d.day() === 6
+// 若為六日，退到前一個工作日（週五）
+function snapWeekday(dateStr: string): string {
+  let d = dayjs(dateStr)
+  while (isWeekend(d)) d = d.add(-1, 'day')
+  return d.format('YYYY-MM-DD')
+}
 
 const loaded = ref(false)
 const markets = ref<Market[]>([])
 const allTags = ref<Tag[]>([])
 const curMarket = ref<string | null>(null)
-const curDate = ref<string>(session.record.date ?? dayjs().format('YYYY-MM-DD'))
+const curDate = ref<string>(session.record.date ?? snapWeekday(dayjs().format('YYYY-MM-DD')))
 
 const entry = ref<Entry | null>(null)
 const slots = ref<SlotPaths>({ ...EMPTY })
@@ -117,8 +125,32 @@ function changeNote(json: string) {
 }
 
 function moveDate(dir: 1 | -1) {
-  curDate.value = dayjs(curDate.value).add(dir, 'day').format('YYYY-MM-DD')
+  // 只走交易日：跳過週六日
+  let d = dayjs(curDate.value).add(dir, 'day')
+  while (isWeekend(d)) d = d.add(dir, 'day')
+  curDate.value = d.format('YYYY-MM-DD')
 }
+// 日曆跳選（停用六日）
+const calValue = computed<DateValue | undefined>(() =>
+  curDate.value ? parseDate(curDate.value) : undefined,
+)
+function onCalUpdate(v: unknown) {
+  if (!v || Array.isArray(v)) return
+  const s = (v as DateValue).toString()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) curDate.value = s
+}
+const isDateUnavailable = (d: DateValue) => {
+  const w = new Date(d.toString() + 'T00:00:00').getDay()
+  return w === 0 || w === 6
+}
+// 顯示用的前/後交易日（跳過六日）
+function weekdayNeighbor(dir: 1 | -1): dayjs.Dayjs {
+  let d = dayjs(curDate.value).add(dir, 'day')
+  while (isWeekend(d)) d = d.add(dir, 'day')
+  return d
+}
+const prevDate = computed(() => weekdayNeighbor(-1))
+const nextDate = computed(() => weekdayNeighbor(1))
 function moveMarket(dir: 1 | -1) {
   const order = marketOrder.value
   if (order.length < 2) return
@@ -203,25 +235,32 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
         <div class="flex items-center gap-4">
           <span class="font-mono text-dimmed">←</span>
           <div class="flex flex-col items-center w-[54px] text-dimmed">
-            <span class="text-sm font-mono">{{ dayjs(curDate).add(-1, 'day').format('M/D') }}</span>
-            <span class="text-[10px]">{{ wd(dayjs(curDate).add(-1, 'day')) }}</span>
+            <span class="text-sm font-mono">{{ prevDate.format('M/D') }}</span>
+            <span class="text-[10px]">{{ wd(prevDate) }}</span>
           </div>
           <div class="flex flex-col items-center w-24">
             <span class="font-semibold text-xl font-mono">{{ dayjs(curDate).format('M/D') }}</span>
             <span class="text-xs text-dimmed">{{ wd(curDate) }}</span>
           </div>
           <div class="flex flex-col items-center w-[54px] text-dimmed">
-            <span class="text-sm font-mono">{{ dayjs(curDate).add(1, 'day').format('M/D') }}</span>
-            <span class="text-[10px]">{{ wd(dayjs(curDate).add(1, 'day')) }}</span>
+            <span class="text-sm font-mono">{{ nextDate.format('M/D') }}</span>
+            <span class="text-[10px]">{{ wd(nextDate) }}</span>
           </div>
           <span class="font-mono text-dimmed">→</span>
         </div>
-        <input
-          type="date"
-          :value="curDate"
-          class="rounded-md border border-default bg-default px-2 py-1 text-sm"
-          @change="curDate = ($event.target as HTMLInputElement).value || curDate"
-        />
+        <UPopover>
+          <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-calendar">{{
+            dayjs(curDate).format('YYYY/M/D')
+          }}</UButton>
+          <template #content>
+            <UCalendar
+              :model-value="calValue"
+              :is-date-unavailable="isDateUnavailable"
+              class="p-2"
+              @update:model-value="onCalUpdate"
+            />
+          </template>
+        </UPopover>
       </div>
 
       <div class="flex flex-col items-end gap-1 justify-self-end">
