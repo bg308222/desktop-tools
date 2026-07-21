@@ -2,10 +2,13 @@
 import type { Market } from '../../shared/domain'
 
 const api = useApi()
+const toast = useToast()
 
 const markets = ref<Market[]>([])
 const name = ref('')
 const folder = ref('')
+const importFile = ref<HTMLInputElement | null>(null)
+const importing = ref(false)
 
 async function reload() {
   markets.value = await api.markets.list()
@@ -39,6 +42,32 @@ async function move(i: number, dir: -1 | 1) {
 async function toggleArchived(m: Market) {
   await api.markets.setArchived(m.id, !m.archived)
   await reload()
+}
+
+function exportData() {
+  window.location.href = '/api/app/export'
+}
+async function onImportPick(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!confirm('匯入會覆蓋目前所有資料（系統會自動先備份一份），確定要匯入嗎？')) return
+  importing.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    await $fetch('/api/app/import', { method: 'POST', body: fd })
+    toast.add({ color: 'success', title: '匯入完成', description: '已自動備份舊資料，重新載入中…' })
+    setTimeout(() => window.location.reload(), 800)
+  } catch (err: unknown) {
+    toast.add({
+      color: 'error',
+      title: '匯入失敗',
+      description: (err as { message?: string })?.message ?? '未知錯誤',
+    })
+    importing.value = false
+  }
 }
 </script>
 
@@ -97,6 +126,31 @@ async function toggleArchived(m: Market) {
       <code class="block text-sm bg-elevated/60 rounded px-3 py-2 overflow-hidden text-ellipsis whitespace-nowrap">{{
         folder
       }}</code>
+    </div>
+
+    <div class="border border-default rounded-lg p-4">
+      <p class="font-semibold mb-1">資料備份</p>
+      <p class="text-sm text-dimmed mb-3">
+        匯出：把整個資料（記錄、圖片）打包成 .tgz 下載。匯入：從 .tgz 還原，會覆蓋現有資料（系統會自動先備份一份）。
+      </p>
+      <div class="flex gap-2">
+        <UButton icon="i-lucide-download" @click="exportData">匯出資料</UButton>
+        <UButton
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-upload"
+          :loading="importing"
+          @click="importFile?.click()"
+          >匯入資料</UButton
+        >
+        <input
+          ref="importFile"
+          type="file"
+          accept=".tgz,.gz,application/gzip"
+          hidden
+          @change="onImportPick"
+        />
+      </div>
     </div>
   </div>
 </template>
