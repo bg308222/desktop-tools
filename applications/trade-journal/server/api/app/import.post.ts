@@ -26,8 +26,12 @@ export default defineEventHandler(async (event) => {
   // 3) 寫入上傳檔到暫存並解壓覆蓋
   const tmp = join(os.tmpdir(), `tj-import-${randomUUID()}.tgz`)
   fs.writeFileSync(tmp, file.data)
-  fs.rmSync(dataDir, { recursive: true, force: true })
+  // 清空 dataDir 的「內容」而非刪掉目錄本身：正式環境 dataDir 是掛載點（Docker volume），
+  // 直接 rm 掛載點會 EBUSY（Device or resource busy）
   fs.mkdirSync(dataDir, { recursive: true })
+  for (const entry of fs.readdirSync(dataDir)) {
+    fs.rmSync(join(dataDir, entry), { recursive: true, force: true })
+  }
   await extractTgzTo(tmp, dataDir)
   fs.rmSync(tmp, { force: true })
 
