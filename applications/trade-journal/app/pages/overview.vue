@@ -129,6 +129,7 @@ interface CellView {
   label: string
   bgClass: string
   wlt: string
+  devText: string
   title: string
 }
 function cellView(date: string): CellView {
@@ -139,10 +140,11 @@ function cellView(date: string): CellView {
   let wlt = ''
   if (status === 'notrade' || status === 'notrade_reviewed') wlt = '空手'
   else if (e?.actual) wlt = `${e.actual.w}W ${e.actual.l}L`
+  const devText = dev ? `少${dev.miss} · 多${dev.over}` : ''
   const title =
     `${dayjs(date).format('M/D')} ${wd(date)}｜${TAG_LABEL[status]}` +
     (dev ? `｜少${dev.miss} · 多${dev.over}` : '')
-  return { status, label: TAG_LABEL[status], bgClass, wlt, title }
+  return { status, label: TAG_LABEL[status], bgClass, wlt, devText, title }
 }
 
 // ── 右側統計 ──
@@ -277,7 +279,12 @@ onUnmounted(() => {
                       cellView(d).label
                     }}</span>
                   </div>
-                  <span class="ov-wlt font-mono">{{ cellView(d).wlt }}</span>
+                  <div class="ov-btm">
+                    <span class="ov-wlt font-mono">{{ cellView(d).wlt }}</span>
+                    <span v-if="cellView(d).devText" class="ov-dev font-mono">{{
+                      cellView(d).devText
+                    }}</span>
+                  </div>
                 </button>
               </template>
             </div>
@@ -501,9 +508,18 @@ button:not(:disabled) {
   font-size: 16px;
   font-weight: 700;
 }
+.ov-btm {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
 .ov-wlt {
   font-size: 15px;
   opacity: 0.92;
+}
+.ov-dev {
+  font-size: 12px;
+  opacity: 0.72;
 }
 
 /* 中性底（無偏差資料的日子） */
