@@ -27,12 +27,10 @@
 | — | `/` = 依設定 redirect 到 `/overview` 或 `/record` |
 
 - **選單**（`AppSidebar.vue`）：`items` 最上方加「總覽」（`/overview`），再來才是「記錄」（改指向 `/record`）。順序：總覽 → 記錄 → 復盤 → 標籤 → 標籤管理 → 設定。sidebar 既有的 `Ctrl/⌘ + ↑/↓` 循環切頁沿用（自動涵蓋新項）。
-- **預設首頁設定**：存哪由既有機制決定——查 `settings.vue` / server 有無「app 設定」表；本 app 目前 `server/api/app/*` 有 export/import/data-folder，尚無 key-value 設定。
-  - 作法：新增最小的「app 設定」key-value（例如 `app_setting(key TEXT PRIMARY KEY, value TEXT)`），存 `home = 'overview' | 'record'`，預設 `'overview'`。
-  - `/`（`app/pages/index.vue`）改為：讀設定 → `navigateTo(home路徑, { replace: true })`。SSR/CSR 皆可（Nuxt `definePageMeta` middleware 或頁面內 `navigateTo`）。
-  - 設定頁加一個下拉：「預設首頁：總覽 / 記錄」。
-
-> 若之後 CLAUDE 探索發現已有更合適的設定儲存位置，優先沿用，不另建表。
+- **預設首頁**：這是「app 啟動設定」，不是使用者在設定頁改的偏好，也**不進 DB、不進設定頁**。沿用本 app 既有的 env ＋ `runtimeConfig` 慣例（同 `DATA_DIR`）：
+  - `nuxt.config.ts` 的 `runtimeConfig.public` 加 `homePage: process.env.HOME_PAGE || 'overview'`（`public` 讓 client 端 redirect 也讀得到）。
+  - `.env` / 部署設定提供 `HOME_PAGE=overview`（或 `record`）；預設 `'overview'`。
+  - `/`（`app/pages/index.vue`）改為：讀 `useRuntimeConfig().public.homePage` → `navigateTo('/' + homePage, { replace: true })`。可用 `definePageMeta` middleware 或頁面內即時導向。
 
 ---
 
@@ -43,17 +41,15 @@
 ### 3.1 狀態
 沿用既有 `deriveStatus(entry, imagePresence)`：`empty / recorded / reviewed / notrade / notrade_reviewed`，色彩沿用 `StatusBadge`（灰／琥珀／綠／藍／綠）。
 
-### 3.2 純執行落差（偏差）
-對一天的一筆 entry，需 `actual` 與 `ideal` 皆非 null 才可算；`would` 為 null 視為 `{0,0,0}`。採統一模型 **理想 −（實際 ＋ 會做）**，逐維度：
+### 3.2 偏差（只看兩個數，無 T）
+對一天的一筆 entry，需 `actual` 與 `ideal` 皆非 null 才可算；`would`（會做）為 null 視為 `{0,0,0}`。只看兩個量：
 
-- 定義 `shortfall_x = ideal.x − actual.x − would.x`（x ∈ {w, l, t}）
-- **少賺（W）** = `max(0, shortfall_w)` — 本該賺卻沒賺到的 win 數
-- **多賠（L）** = `max(0, −shortfall_l)` = `max(0, actual.l + would.l − ideal.l)` — 比理想多承受的 loss 數
-- **T 偏差** = `abs(shortfall_t)`（僅作字典序最末的 tiebreak，畫面不強調）
-
-> 此為統一公式的直接推論；「多賠」把 `would.l` 計入是為與「少賺」對稱。若之後認為 L 方向該改（例如不計 would.l），於本 spec 修正即可。
-
-- **優先序（字典序）W > L > T**：比較兩天偏差時，先比少賺；相等再比多賠；再相等才比 T 偏差。**三者不加總成單一分數**。
+- **少賺（W）＝ 會做但沒有** ＝ `max(0, ideal.w − actual.w − would.w)`
+  - 理想該賺的 win，扣掉你實際做到的，再扣掉「人不在場、但確定會做」的（會做）——剩下才是你自己該檢討的真·少賺。會做在此代表「補足不在場但確定的操作」，屬可原諒，不算你的錯。
+- **多賠（L）＝ 不該做卻做** ＝ `max(0, actual.l − ideal.l)`
+  - 你做了理想不會做的、而賠掉的 loss 數。**不摻會做**（沒做的不算多賠）。
+- **T 完全不看。**
+- **優先序（字典序）W > L**：比較兩天時先比少賺，相等再比多賠。**兩者不加總成單一分數**。
 - **月曆「偏差熱度」上色**：僅以「少賺（W）」強度決定底色深淺；級距 `0 / 1 / 2 / 3 / 4 / 5+`（0 = 淡綠，5+ = 深紅）。多賠僅以文字呈現。級距門檻先用此預設，實作後可調。
 
 ### 3.3 區間統計指標（右側統計區，跟著選定區間）
@@ -68,7 +64,7 @@
 
 ### 3.4 清單（跟著區間）
 - **待復盤**：區間內狀態 ∈ {`recorded`, `notrade`} 的日子，依日期排序，可點跳。
-- **高偏差待複習**：區間內可算偏差的日子，依 §3.2 字典序（W>L>T）由大到小排，顯示「少X · 多Y」。
+- **高偏差待複習**：區間內可算偏差的日子，依 §3.2 字典序（W>L）由大到小排，顯示「少X · 多Y」。
 
 ---
 
@@ -119,7 +115,7 @@
 ## 7. 測試
 
 - **單元（in-memory）**：
-  - 偏差計算：少賺／多賠／字典序比較（含 `would` 為 null、`ideal`/`actual` 為 null 的邊界）。
+  - 偏差計算：少賺（含扣會做）／多賠／字典序 W>L 比較（含 `would` 為 null、`ideal`/`actual` 為 null 的邊界；`max(0, …)` 夾住負值）。
   - 區間指標：已復盤/有紀錄交易日、待復盤數、Σ少賺/Σ多賠、實際/理想勝率（含除以零 → 勝率顯示 `—`）。
   - `entryRepo.listPresenceByMarketInRange`：圖片存在旗標正確（三種 kind 組合）、範圍/市場過濾正確。
   - 首頁 redirect：依設定導向 `/overview` 或 `/record`。
