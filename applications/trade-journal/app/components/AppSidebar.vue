@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const items = [
-  { to: '/', label: '記錄', icon: '📝' },
+  { to: '/overview', label: '總覽', icon: '📊' },
+  { to: '/record', label: '記錄', icon: '📝' },
   { to: '/viewer', label: '復盤', icon: '🔍' },
   { to: '/tags', label: '標籤', icon: '🏷' },
   { to: '/manage', label: '標籤管理', icon: '📐' },

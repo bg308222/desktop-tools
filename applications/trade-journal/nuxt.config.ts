@@ -7,6 +7,10 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // server 端可讀；正式環境由 NUXT_DATA_DIR 覆寫
     dataDir: process.env.DATA_DIR || './data',
+    public: {
+      // app 啟動設定：首頁 / 導向哪一頁（'overview' | 'record'）；正式環境由 NUXT_PUBLIC_HOME_PAGE 覆寫
+      homePage: process.env.HOME_PAGE || 'overview',
+    },
   },
   colorMode: { preference: 'dark' },
   app: {
