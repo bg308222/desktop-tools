@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Db } from '../types'
-import type { Entry, Wlt } from '../../../shared/domain'
+import type { Entry, EntryWithPresence, Wlt } from '../../../shared/domain'
 
 interface EntryRow {
   id: string
@@ -128,6 +128,34 @@ export function createEntryRepo(db: Db) {
   const listByDate = (date: string): Entry[] =>
     db.prepare(`SELECT * FROM entry WHERE trade_date = :d`).all<EntryRow>({ d: date }).map(toEntry)
 
+  /** 某市場、某日期範圍的 entry，附帶三種圖是否存在（供總覽算狀態）。 */
+  const listPresenceByMarketInRange = (
+    marketId: string,
+    from: string,
+    to: string,
+  ): EntryWithPresence[] =>
+    db
+      .prepare(
+        `SELECT e.*,
+           MAX(CASE WHEN i.kind = 'trade'  THEN 1 ELSE 0 END) AS has_trade,
+           MAX(CASE WHEN i.kind = 'raw'    THEN 1 ELSE 0 END) AS has_raw,
+           MAX(CASE WHEN i.kind = 'review' THEN 1 ELSE 0 END) AS has_review
+         FROM entry e
+         LEFT JOIN image i ON i.entry_id = e.id
+         WHERE e.market_id = :m AND e.trade_date >= :from AND e.trade_date <= :to
+         GROUP BY e.id
+         ORDER BY e.trade_date`,
+      )
+      .all<EntryRow & { has_trade: number; has_raw: number; has_review: number }>({
+        m: marketId,
+        from,
+        to,
+      })
+      .map((r) => ({
+        ...toEntry(r),
+        images: { trade: !!r.has_trade, raw: !!r.has_raw, review: !!r.has_review },
+      }))
+
   const listByTagIds = (tagIds: string[]): Entry[] => {
     if (tagIds.length === 0) return []
     const placeholders = tagIds.map((_, i) => `:t${i}`).join(', ')
@@ -164,6 +192,7 @@ export function createEntryRepo(db: Db) {
     setNote,
     listInRange,
     listByMarketInRange,
+    listPresenceByMarketInRange,
     listByDate,
     listByTagIds,
     distinctDates,

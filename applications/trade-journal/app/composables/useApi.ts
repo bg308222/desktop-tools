@@ -1,4 +1,13 @@
-import type { Market, Entry, ImageRec, ImageKind, Tag, TagImage, Wlt } from '../../shared/domain'
+import type {
+  Market,
+  Entry,
+  EntryWithPresence,
+  ImageRec,
+  ImageKind,
+  Tag,
+  TagImage,
+  Wlt,
+} from '../../shared/domain'
 
 export interface EntryUpsertInput {
   marketId: string
@@ -92,6 +101,12 @@ export function useApi() {
         call(() => $fetch<Tag[]>('/api/tags/entry', { query: { entry: entryId } })),
       setEntryTags: (entryId: string, tagIds: string[]) =>
         call(() => $fetch('/api/tags/entry', { method: 'POST', body: { entryId, tagIds } })),
+    },
+    overview: {
+      list: (marketId: string, from: string, to: string) =>
+        call(() =>
+          $fetch<EntryWithPresence[]>('/api/overview', { query: { market: marketId, from, to } }),
+        ),
     },
     app: {
       dataFolder: () =>

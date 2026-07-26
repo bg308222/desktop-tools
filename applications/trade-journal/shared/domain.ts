@@ -56,3 +56,8 @@ export interface ImagePresence {
   raw: boolean
   review: boolean
 }
+
+/** entry 加上「三種圖是否存在」——供總覽頁一次算狀態與偏差。 */
+export interface EntryWithPresence extends Entry {
+  images: ImagePresence
+}
