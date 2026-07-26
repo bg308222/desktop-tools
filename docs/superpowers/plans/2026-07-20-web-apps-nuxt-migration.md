@@ -4,15 +4,15 @@
 
 **Goal:** 把 `desktop-tools`（Electron + React + sql.js 桌面工具集合）改造成 `web-apps`（Nuxt Vue 全端、容器化的 web 應用集合），並把第一個 app `trade-journal` 從 Electron 完整遷移到 Nuxt。
 
-**Architecture:** 每個 app 是獨立 Nuxt app：`app/`（Vue 3 + Nuxt UI 前端）、`server/`（Nitro 後端，取代舊 IPC）、`shared/`（前後端共用 domain 型別與純邏輯）。資料以 `bun:sqlite` 存於 `DATA_DIR`（DB 檔 + 圖片資料夾），開發本機跑、最終 build 成 Docker image。舊有的 repositories 只依賴一層 `Db` 抽象介面，換上 `bun:sqlite` driver 後幾乎零改；純邏輯與其 vitest 測試直接搬移當回歸基準。
+**Architecture:** 每個 app 是獨立 Nuxt app：`app/`（Vue 3 + Nuxt UI 前端）、`server/`（Nitro 後端，取代舊 IPC）、`shared/`（前後端共用 domain 型別與純邏輯）。資料以 `better-sqlite3` 存於 `DATA_DIR`（DB 檔 + 圖片資料夾），開發本機跑、最終 build 成 Docker image。舊有的 repositories 只依賴一層 `Db` 抽象介面，換上 `better-sqlite3` driver 後幾乎零改；純邏輯與其 vitest 測試直接搬移當回歸基準。
 
-**Tech Stack:** Bun、Nuxt 4（Vue 3 + Nitro，preset `bun`）、Nuxt UI、`bun:sqlite`、TipTap Vue（`@tiptap/vue-3` + mention + suggestion）、`image-size`、Vitest、just、Docker（`oven/bun`）。
+**Tech Stack:** Bun（套件管理 + build）、Node（server runtime：dev/test/prod）、Nuxt 4（Vue 3 + Nitro，`node-server` preset）、Nuxt UI、`better-sqlite3`、TipTap Vue（`@tiptap/vue-3` + mention + suggestion）、`image-size`、Vitest、`tsx`（跑 mock 腳本）、just、Docker（build 用 `oven/bun`、runtime 用 `node`）。
 
 ## Global Constraints
 
 - **套件版本一律寫死**（`package.json` 不得出現 `^`／`~`）。安裝時一律用 `bun add --exact <pkg>`（dev 相依用 `bun add --exact --dev`），讓 `package.json` 記錄解析後的精確版本。
 - **所有使用者可見文案、commit message、程式碼中文註解用繁體中文。**
-- **執行時為 Bun**：dev 用 `bun run dev`，正式用 Nitro `bun` preset 產出 `.output/server/index.mjs` 以 `bun` 執行——確保 `bun:sqlite` 可用。
+- **Server runtime 為 Node**：dev（`bun run dev` 實際由 Node 跑 Nitro）、test（Vitest/Node）、prod（`node .output/server/index.mjs`）皆 Node——因為 `better-sqlite3` 是 node-ABI 原生模組（在 Bun 下 `new Database()` 會崩潰）。Bun 僅用於套件管理與 build。
 - **資料位置**：`DATA_DIR` 環境變數；開發預設 `./data`（即 app root 下 `data/`，必須 gitignore）；Docker 掛 `/data`。DB 檔 `journal.db`、圖片在 `images/` 子目錄。
 - **env 無秘密**：每個 app 的 `.env` 直接 commit。
 - **Nuxt 4 目錄慣例**：前端 `app/`、後端 `server/`、共用 `shared/`。
@@ -240,14 +240,14 @@ bun add --exact nuxt vue vue-router @nuxt/ui @tiptap/vue-3 @tiptap/pm @tiptap/st
 bun add --exact --dev vitest @vue/test-utils happy-dom @nuxt/test-utils typescript vue-tsc
 ```
 
-- [ ] **Step 2: nuxt.config.ts（Nuxt UI、bun preset、DATA_DIR runtimeConfig）**
+- [ ] **Step 2: nuxt.config.ts（Nuxt UI、node-server preset、DATA_DIR runtimeConfig）**
 
 ```ts
 export default defineNuxtConfig({
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
   ssr: true,
-  nitro: { preset: 'bun' },
+  nitro: { preset: 'node-server' },
   runtimeConfig: {
     dataDir: process.env.DATA_DIR || './data', // 只在 server 端可讀
   },
@@ -390,7 +390,7 @@ git commit -m "feat(trade-journal): Nuxt app 骨架，可啟動空頁"
 
 ---
 
-# Phase 3 — DB 層（bun:sqlite）
+# Phase 3 — DB 層（better-sqlite3）
 
 ### Task 3.1: Db 介面型別與 schema
 
@@ -424,7 +424,7 @@ export const SCHEMA: string // 由 schema.ts 匯出
 - [ ] **Step 3: 型別檢查** — Run: `bun run typecheck` Expected: 無錯誤。
 - [ ] **Step 4: Commit** — `git commit -m "feat(trade-journal): DB 介面型別與 schema"`
 
-### Task 3.2: bun:sqlite driver（connection）
+### Task 3.2: better-sqlite3 driver（connection）
 
 **Files:**
 - Create: `server/db/connection.ts`
@@ -439,54 +439,51 @@ export const SCHEMA: string // 由 schema.ts 匯出
 - [ ] **Step 3: 實作 connection.ts**
 
 ```ts
-import { Database } from 'bun:sqlite'
+import Database from 'better-sqlite3'
+import fs from 'node:fs'
+import { dirname } from 'node:path'
 import { SCHEMA } from './schema'
 import type { Db, Stmt, BindParams } from './types'
 
-// 把 {name: v} 正規化成 {':name': v}；已有 :/$/@ 前綴者保留；陣列原樣回傳
+// better-sqlite3 具名參數用 bare key（SQL 內為 :name），移除可能的 :/$/@ 前綴
 function normalize(params?: BindParams) {
   if (params == null) return undefined
   if (Array.isArray(params)) return params
   const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(params)) {
-    const key = /^[:$@]/.test(k) ? k : ':' + k
-    out[key] = v
-  }
+  for (const [k, v] of Object.entries(params)) out[k.replace(/^[:$@]/, '')] = v
   return out
 }
 
 export function openDb(source?: string): Db {
-  const database = new Database(source ?? ':memory:', { create: true })
-  database.run('PRAGMA foreign_keys = ON;')
-  database.exec(SCHEMA)
+  const file = source && source !== ':memory:' ? source : ':memory:'
+  if (file !== ':memory:') fs.mkdirSync(dirname(file), { recursive: true })
+  const db = new Database(file)
+  db.pragma('foreign_keys = ON')
+  db.exec(SCHEMA)
 
   const prepare = (sql: string): Stmt => {
-    const q = database.query(sql)
+    const st = db.prepare(sql)
     return {
-      run: (params) => { q.run(normalize(params) as never) },
-      get: <T,>(params) => (q.get(normalize(params) as never) as T) ?? undefined,
-      all: <T,>(params) => q.all(normalize(params) as never) as T[],
+      run(params) { if (params === undefined) st.run(); else st.run(normalize(params) as never) },
+      get: <T,>(params) => (params === undefined ? st.get() : st.get(normalize(params) as never)) as T | undefined,
+      all: <T,>(params) => (params === undefined ? st.all() : st.all(normalize(params) as never)) as T[],
     }
   }
 
   return {
     prepare,
-    exec: (sql) => { database.exec(sql) },
-    transaction<T>(fn: () => T): T {
-      database.run('BEGIN')
-      try { const r = fn(); database.run('COMMIT'); return r }
-      catch (e) { database.run('ROLLBACK'); throw e }
-    },
+    exec: (sql) => { db.exec(sql) },
+    transaction<T>(fn: () => T): T { return db.transaction(fn)() },
     persist: () => {}, // 真檔案 DB 免匯出
-    close: () => database.close(),
+    close: () => db.close(),
   }
 }
 ```
 
-- [ ] **Step 4: 跑測試看綠** — Run: `bunx vitest run test/connection.test.ts` Expected: PASS。若失敗於命名參數，確認 SQL 用 `:name` 且 repo 傳 `{name: v}`（由 `normalize` 補冒號）。
-- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): bun:sqlite driver（connection）"`
+- [ ] **Step 4: 跑測試看綠** — Run: `bunx vitest run test/connection.test.ts` Expected: PASS。若失敗於命名參數，確認 SQL 用 `:name` 且 repo 傳 `{name: v}`（由 `normalize` 去前綴）。
+- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): better-sqlite3 driver（connection）"`
 
-> 風險註記：`bun:sqlite` 僅在 Bun runtime 可用。dev（`nuxt dev` 經 `bun run`）與正式（nitro `bun` preset）皆在 Bun 下執行。若 dev 期 Nitro 於非 Bun 子行程載入而 import 失敗，後備方案為改用 `better-sqlite3`（同形 API，把 `Database` 換掉、`query`→`prepare` 即可），其餘 repo 不動。
+> 實作修正：原規劃用 `bun:sqlite`，但 **Nuxt/Nitro dev server 一律在 Node 下跑**（Vite 使然），`bun:sqlite` 只存在於 Bun runtime → dev 500。故改用 **`better-sqlite3`**（Node 原生、附 prebuilt），dev/test/prod 全程 Node、單一驅動；測試維持 Vitest（Node）。詳見設計文件「實作修正」一節。
 
 ### Task 3.3–3.7: 五個 repository（各一任務）
 
@@ -506,7 +503,7 @@ export function openDb(source?: string): Db {
 - [ ] **Step 2: 跑測試看紅** — Run: `bunx vitest run test/entryRepo.test.ts` Expected: FAIL。
 - [ ] **Step 3: 複製 `entryRepo.ts`，改 `Db` import 為 `../types`。**（邏輯逐字保留：`upsert` 用 `db.transaction`；`setWlt` 動態選 actual_/ideal_ 三欄；`listByTagIds` 空陣列回 `[]`、否則動態 placeholder。）
 - [ ] **Step 4: 跑測試看綠** — Run: `bunx vitest run test/entryRepo.test.ts` Expected: PASS。
-- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): entryRepo（bun:sqlite）與測試"`
+- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): entryRepo（better-sqlite3）與測試"`
 
 ### Task 3.4: imageRepo
 
@@ -517,7 +514,7 @@ export function openDb(source?: string): Db {
 - [ ] **Step 2: 跑測試看紅** — Run: `bunx vitest run test/imageRepo.test.ts` Expected: FAIL。
 - [ ] **Step 3: 複製 `imageRepo.ts`，改 Db import。**
 - [ ] **Step 4: 跑測試看綠** — Run: `bunx vitest run test/imageRepo.test.ts` Expected: PASS。
-- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): imageRepo（bun:sqlite）與測試"`
+- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): imageRepo（better-sqlite3）與測試"`
 
 ### Task 3.5: marketRepo
 
@@ -528,7 +525,7 @@ export function openDb(source?: string): Db {
 - [ ] **Step 2: 跑測試看紅** — Run: `bunx vitest run test/marketRepo.test.ts` Expected: FAIL。
 - [ ] **Step 3: 複製 `marketRepo.ts`，改 Db import。**
 - [ ] **Step 4: 跑測試看綠** — Run: `bunx vitest run test/marketRepo.test.ts` Expected: PASS。
-- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): marketRepo（bun:sqlite）與測試"`
+- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): marketRepo（better-sqlite3）與測試"`
 
 ### Task 3.6: tagRepo
 
@@ -539,7 +536,7 @@ export function openDb(source?: string): Db {
 - [ ] **Step 2: 跑測試看紅** — Run: `bunx vitest run test/tagRepo.test.ts` Expected: FAIL。
 - [ ] **Step 3: 複製 `tagRepo.ts`，改 Db import。**
 - [ ] **Step 4: 跑測試看綠** — Run: `bunx vitest run test/tagRepo.test.ts` Expected: PASS。
-- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): tagRepo（bun:sqlite）與測試"`
+- [ ] **Step 5: Commit** — `git commit -m "feat(trade-journal): tagRepo（better-sqlite3）與測試"`
 
 ### Task 3.7: ruleRepo
 
@@ -551,7 +548,7 @@ export function openDb(source?: string): Db {
 - [ ] **Step 3: 複製 `ruleRepo.ts`，改 Db import。**（保留 `setEntryRuleRefs` 的 transaction「先刪後 INSERT OR IGNORE」、`nextOrder` helper。）
 - [ ] **Step 4: 跑測試看綠** — Run: `bunx vitest run test/ruleRepo.test.ts` Expected: PASS。
 - [ ] **Step 5: 全 repo 回歸** — Run: `bunx vitest run` Expected: 全數 PASS。
-- [ ] **Step 6: Commit** — `git commit -m "feat(trade-journal): ruleRepo（bun:sqlite）與測試"`
+- [ ] **Step 6: Commit** — `git commit -m "feat(trade-journal): ruleRepo（better-sqlite3）與測試"`
 
 ---
 
@@ -1356,24 +1353,26 @@ data
 *.log
 ```
 
-- [ ] **Step 2: Dockerfile（oven/bun，多階段）**
+- [ ] **Step 2: Dockerfile（build 用 bun、runtime 用 node，多階段）**
 
 ```dockerfile
+# 以 Bun 安裝與建置（速度快），以 Node 執行（better-sqlite3 為 node-ABI 原生模組）
 FROM oven/bun:1 AS build
 WORKDIR /app
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+COPY package.json ./
+RUN bun install
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1 AS runtime
+FROM node:24-slim AS runtime
 WORKDIR /app
 COPY --from=build /app/.output ./.output
-ENV DATA_DIR=/data
 ENV NUXT_DATA_DIR=/data
+ENV DATA_DIR=/data
+ENV PORT=3000
 EXPOSE 3000
 VOLUME ["/data"]
-CMD ["bun", ".output/server/index.mjs"]
+CMD ["node", ".output/server/index.mjs"]
 ```
 
 （註：`runtimeConfig.dataDir` 於正式環境由 `NUXT_DATA_DIR` 覆寫；`DATA_DIR` 保留供其他用途一致。）
@@ -1418,7 +1417,7 @@ git rm .github/workflows/build-trade-journal.yml
 **1. Spec coverage（逐項對照設計文件）:**
 - repo 更名 web-apps / applications 目錄 → Task 0.1 ✓
 - Nuxt(Vue) 全端 + Nuxt UI → Task 1.1 / 7.1 / 8.x ✓
-- bun:sqlite（淘汰 sql.js WASM）→ Task 3.2；repos 沿用 → 3.3–3.7 ✓
+- better-sqlite3（淘汰 sql.js WASM）→ Task 3.2；repos 沿用 → 3.3–3.7 ✓
 - 圖片檔案系統 + DATA_DIR volume → Task 4.1 / 10.1 ✓；`GET /api/images/file` bytes → 5.3 ✓
 - IPC→REST-ish 對照 + 型別化 client → API 契約表 / Task 5.x / 6.1 ✓
 - 桌面專屬點調整：`openDataFolder` 移除、`dataFolder` 唯讀、`readDataUrl`→file 路由 → 5.6 / 9.5 / 5.3 ✓

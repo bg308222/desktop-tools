@@ -1,0 +1,33 @@
+# web-apps 集合 — 正式部署入口。
+# 部署「已 build 好」的 image（各 app 先跑 just build <app> 產出 <app>:<version>），
+# 這裡不負責 build。資料存 Docker named volume。
+#
+# 用法：
+#   在根 .env 設好各 app 的 tag/port（見 .env.sample），然後：
+#     docker compose up -d trade-journal   # 起單一 app
+#     docker compose up -d                 # 起全部 app
+#   停：docker compose down
+#
+# 新增 app：複製一段 service，改名字、image、port 與 volume 即可。
+
+services:
+  trade-journal:
+    image: trade-journal:${TRADE_JOURNAL_TAG:-latest}
+    container_name: trade-journal
+    restart: unless-stopped
+    ports:
+      # 主機埠可用 .env 的 TRADE_JOURNAL_PORT 覆寫；容器內固定 3000
+      - "${TRADE_JOURNAL_PORT:-3000}:3000"
+    volumes:
+      # 資料（journal.db + 圖片）存在 named volume；DATA_DIR/NUXT_DATA_DIR 已在 image 內設為 /data
+      - trade-journal-data:/data
+    healthcheck:
+      # node:24 內建 fetch，不必額外裝 curl
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  trade-journal-data:

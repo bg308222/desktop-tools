@@ -33,14 +33,27 @@
 | 框架 | **Nuxt（Vue 全端）**，前端 Vue 3 + 後端 Nitro 一體 |
 | UI 元件庫 | **Nuxt UI**（Tailwind + Reka UI 基底） |
 | 備註編輯器 | **TipTap Vue**（含 mention 擴充，規則 chip 沿用） |
-| 資料庫 | **`bun:sqlite`**（Bun 內建、零相依、同步 API），schema 沿用舊版 |
+| 資料庫 | **`better-sqlite3`**（Node 原生、同步 API，附 prebuilt 免編譯），schema 沿用舊版。<br>⚠️ 原規劃為 `bun:sqlite`，實作時改為 better-sqlite3（見下方「實作修正」） |
 | 圖片儲存 | 檔案系統（`DATA_DIR/images/...`），DB 只存相對路徑 |
 | 資料位置 | `DATA_DIR` 環境變數，開發預設 `{app root}/data`，Docker 掛 `/data` |
 | API 風格 | REST-ish Nitro `server/api/` 路由；前端以型別化 `useApi()` composable 包 `$fetch` |
-| 部署 | 開發時本機跑；最終每個 app **build 成 Docker image** |
+| 部署 | 開發時本機跑；最終每個 app **build 成 Docker image**（build 用 bun、runtime 用 node，見「實作修正」） |
 | 驗證/帳號 | v1 不做 |
 | env | 無秘密 → 每個 app 直接 commit `.env`；`data/` 加入 `.gitignore` |
 | 舊資料遷移 | schema 不變，既有 `journal.db` 可直接沿用，不需遷移工具 |
+
+### 實作修正：為何不用 `bun:sqlite`（改用 better-sqlite3 + Node runtime）
+
+原規劃選 `bun:sqlite`（Bun 內建、零相依）。實作時發現一個硬限制：
+
+- **`bun:sqlite` 只有在 Bun runtime 存在**；但 **Nuxt/Nitro 的 dev server 一律跑在 Node 上**（Vite 使然），即使用 `bun run dev` 啟動也一樣。Node 不認得 `bun:` module scheme，dev 一開就 500。
+- Nitro 的 `preset: 'bun'` **只影響 `nuxt build` 的正式產物**，與 dev 無關；dev 永遠是 Node。
+
+因此改為 **`better-sqlite3`**（Node 原生模組，附 prebuilt 二進位、免 C/C++ toolchain），讓 **dev / test / prod 全程都在 Node**、單一驅動、repository 不用改：
+
+- **Runtime 統一 Node**：Docker build 階段用 `oven/bun`（裝得快），**runtime 改用 `node` image**；Nitro preset 用預設的 `node-server`。
+- **測試維持 Vitest**（Node）——better-sqlite3 在 Node 下可直接載入。
+- 註：`bun:sqlite` 的原生 `.node` 綁定連結 V8 符號，在 Bun（JavaScriptCore）下 `new Database()` 會 `undefined symbol` 崩潰，故凡是需要 better-sqlite3 的腳本（如 `mock`）都以 Node（`tsx`）執行。
 
 ---
 
@@ -68,7 +81,7 @@ web-apps/
         assets/
       server/               # Nitro 後端
         api/                #   取代 IPC 的 HTTP 路由
-        db/                 #   bun:sqlite 連線 + repositories（沿用）
+        db/                 #   better-sqlite3 連線 + repositories（沿用）
         utils/
       shared/               # domain 型別（前後端 auto-import 共用）
       test/
@@ -91,7 +104,7 @@ web-apps/
 ┌──────────────────────────────────────────────┐
 │ Nitro server（server/）                        │
 │  - server/api/*  ：REST-ish 路由（等同舊 IPC）    │
-│  - server/db/    ：bun:sqlite 連線 + repositories │
+│  - server/db/    ：better-sqlite3 連線 + repositories │
 │  - 圖片檔 import/copy/read（DATA_DIR/images）      │
 └───────────────▲──────────────────────────────┘
                 │ HTTP（$fetch），型別來自 shared/
@@ -107,14 +120,14 @@ shared/  ← domain 型別（Market/Entry/Rule/…）與 API 契約型別，兩�
 ### 分層原則（沿用舊設計精神）
 
 - **後端只暴露一組明確路由**；前端不直接碰 DB 或檔案系統。
-- **repositories**：每個資料表一個 repository 模組，封裝 SQL；用 in-memory `bun:sqlite` 可單元測試。
+- **repositories**：每個資料表一個 repository 模組，封裝 SQL；用 in-memory `better-sqlite3` 可單元測試。
 - **純邏輯抽離**：Viewer 導覽計算、完成度推導、`@` 提及 token 解析等，抽成不依賴 DOM/DB 的純函式，直接沿用舊版。
 
 ### 可直接重用的既有程式碼
 
 - `shared/domain.ts`：純型別，無 Electron 相依 → **原封搬過去**。
 - `shared/mention.ts`、Viewer 導覽等純函式 → **原封搬過去**。
-- `electron/db/repositories/*`：SQL 邏輯沿用，只把驅動從 `sql.js` 換成 `bun:sqlite`（薄封裝介面 `prepare/run/get/all/transaction` 可保留）。
+- `electron/db/repositories/*`：SQL 邏輯沿用，只把驅動從 `sql.js` 換成 `better-sqlite3`（薄封裝介面 `prepare/run/get/all/transaction` 可保留）。
 
 ---
 
@@ -122,9 +135,9 @@ shared/  ← domain 型別（Market/Entry/Rule/…）與 API 契約型別，兩�
 
 ### 資料庫
 
-- 引擎：**`bun:sqlite`**。啟動時開啟 `DATA_DIR/journal.db`（不存在則建立 + 套用 schema）。
+- 引擎：**`better-sqlite3`**。啟動時開啟 `DATA_DIR/journal.db`（不存在則建立 + 套用 schema）。
 - schema 沿用舊版（markets / entries / images / tags / rules / rule_groups / entry_rule_ref / rule_images 等），既有 `journal.db` 可直接放進 `data/` 沿用。
-- 對比舊版：不再需要「啟動載入 bytes、debounce 匯出回檔」那套 WASM 持久化——`bun:sqlite` 直接讀寫檔案。
+- 對比舊版：不再需要「啟動載入 bytes、debounce 匯出回檔」那套 WASM 持久化——`better-sqlite3` 直接讀寫檔案。
 
 ### 圖片
 
@@ -178,9 +191,8 @@ shared/  ← domain 型別（Market/Entry/Rule/…）與 API 契約型別，兩�
 
 ### Dockerfile（每 app 一份）
 
-- base：`oven/bun`。
-- 步驟：`bun install` → `nuxt build`（Nitro **bun preset**）→ 執行 `bun .output/server/index.mjs`。
-- 資料：容器內以 volume 掛 `/data`，`DATA_DIR=/data`。
+- 多階段：build 用 `oven/bun`（`bun install` → `nuxt build`，Nitro 預設 **node-server preset**），runtime 用 `node`（`node .output/server/index.mjs`）。
+- 資料：容器內以 volume 掛 `/data`，runtime 以 `NUXT_DATA_DIR=/data` 覆寫（Nuxt runtimeConfig 慣例）。
 
 ### justfile
 
@@ -208,7 +220,7 @@ shared/  ← domain 型別（Market/Entry/Rule/…）與 API 契約型別，兩�
 ## 9. 測試策略
 
 - 續用 **Vitest**。
-- **repositories**：以 in-memory `bun:sqlite` 測 SQL 行為。
+- **repositories**：以 in-memory `better-sqlite3` 測 SQL 行為。
 - **純邏輯**：Viewer 導覽、完成度、mention token 解析等純函式沿用既有測試。
 - **Vue 元件**：`@vue/test-utils` / Nuxt test utils。
 
@@ -219,7 +231,7 @@ shared/  ← domain 型別（Market/Entry/Rule/…）與 API 契約型別，兩�
 1. repo 更名 `web-apps`，建立 `applications/` 與根 `justfile`（dev/bump/build 轉發）。
 2. 建 `applications/trade-journal` Nuxt 骨架（`app/` `server/` `shared/`、`nuxt.config.ts`、`.env`、`.gitignore`、`Dockerfile`）。
 3. 搬 `shared/domain.ts`、純邏輯（mention、viewer 導覽）到新 `shared/`。
-4. 搬 repositories 到 `server/db/`，驅動換 `bun:sqlite`。
+4. 搬 repositories 到 `server/db/`，驅動換 `better-sqlite3`。
 5. 建 Nitro `server/api/` 路由（依第 6 節對照），前端 `useApi()` composable。
 6. 用 Vue + Nuxt UI 重寫 5 個 page；備註接 TipTap Vue + mention。
 7. justfile / Dockerfile 完成，`just dev`、`just build` 可跑。

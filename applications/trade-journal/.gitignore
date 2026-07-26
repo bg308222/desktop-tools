@@ -1,0 +1,10 @@
+node_modules/
+.nuxt/
+.output/
+.data/
+dist/
+data/
+data-bak/
+data-*/
+*.log
+.DS_Store
