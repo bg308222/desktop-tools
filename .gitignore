@@ -1,3 +1,6 @@
 # 根層 .env（設定預設操作的 app），不進版控；請參考 .env.sample
 /.env
 .DS_Store
+
+# brainstorming 視覺 companion 的暫存 mockup
+/.superpowers/
