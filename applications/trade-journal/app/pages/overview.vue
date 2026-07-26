@@ -249,7 +249,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 主體 -->
-    <div class="flex-1 min-h-0 grid grid-cols-[1fr_328px] gap-3.5 p-3.5">
+    <div class="flex-1 min-h-0 grid grid-cols-[1fr_384px] gap-4 p-4">
       <!-- 月曆面板：可捲區 + 固定圖例 -->
       <div class="ov-cal-panel flex flex-col min-h-0 rounded-2xl border border-default bg-default overflow-hidden">
         <div ref="calEl" class="ov-cal flex-1 min-h-0 overflow-y-auto px-3.5 pb-3">
@@ -314,7 +314,7 @@ onUnmounted(() => {
               <button
                 v-for="r in (['7', '30', '90', 'custom'] as const)"
                 :key="r"
-                class="text-[11px] px-2.5 py-1 rounded-full border"
+                class="text-xs px-3 py-1.5 rounded-full border"
                 :class="
                   rangeMode === r
                     ? 'bg-primary text-inverted border-primary font-semibold'
@@ -342,8 +342,8 @@ onUnmounted(() => {
           </div>
           <div class="grid grid-cols-2">
             <div class="p-3.5 border-t border-r border-default">
-              <div class="text-[10px] uppercase text-dimmed">已復盤/有紀錄</div>
-              <div class="text-xl font-bold mt-0.5">
+              <div class="text-[11px] uppercase text-dimmed">已復盤/有紀錄</div>
+              <div class="text-2xl font-bold mt-0.5">
                 {{ summary.stats.reviewedDays
                 }}<small class="text-xs text-dimmed font-medium"
                   >/{{ summary.stats.recordedDays }}</small
@@ -351,25 +351,25 @@ onUnmounted(() => {
               </div>
             </div>
             <div class="p-3.5 border-t border-default">
-              <div class="text-[10px] uppercase text-dimmed">待復盤</div>
-              <div class="text-xl font-bold mt-0.5 ov-ok">{{ summary.stats.todoDays }}</div>
+              <div class="text-[11px] uppercase text-dimmed">待復盤</div>
+              <div class="text-2xl font-bold mt-0.5 ov-ok">{{ summary.stats.todoDays }}</div>
             </div>
             <div class="p-3.5 border-t border-r border-default">
-              <div class="text-[10px] uppercase text-dimmed">少賺 / 多賠</div>
+              <div class="text-[11px] uppercase text-dimmed">少賺 / 多賠</div>
               <div class="flex gap-3.5 items-baseline mt-0.5">
-                <span class="text-xl font-bold ov-mk"
+                <span class="text-2xl font-bold ov-mk"
                   >{{ summary.stats.missSum
-                  }}<small class="block text-[9px] text-dimmed font-medium">少賺W</small></span
+                  }}<small class="block text-[10px] text-dimmed font-medium">少賺W</small></span
                 >
-                <span class="text-base font-bold ov-ok"
+                <span class="text-lg font-bold ov-ok"
                   >{{ summary.stats.overSum
-                  }}<small class="block text-[9px] text-dimmed font-medium">多賠L</small></span
+                  }}<small class="block text-[10px] text-dimmed font-medium">多賠L</small></span
                 >
               </div>
             </div>
             <div class="p-3.5 border-t border-default">
-              <div class="text-[10px] uppercase text-dimmed">實際/理想勝率</div>
-              <div class="text-xl font-bold mt-0.5">
+              <div class="text-[11px] uppercase text-dimmed">實際/理想勝率</div>
+              <div class="text-2xl font-bold mt-0.5">
                 {{ pct(summary.stats.actualWinRate)
                 }}<small class="text-xs text-dimmed font-medium"
                   >/{{ pct(summary.stats.idealWinRate) }}</small
@@ -381,14 +381,14 @@ onUnmounted(() => {
 
         <!-- 待復盤清單 -->
         <div class="rounded-2xl border border-default bg-default overflow-hidden">
-          <h4 class="flex justify-between items-center px-3.5 py-2.5 text-xs bg-elevated border-b border-default font-semibold">
+          <h4 class="flex justify-between items-center px-3.5 py-3 text-sm bg-elevated border-b border-default font-semibold">
             待復盤 <span class="text-dimmed font-normal">{{ summary.todo.length }}</span>
           </h4>
           <div class="ov-list max-h-[240px] overflow-y-auto">
             <button
               v-for="t in summary.todo"
               :key="t.date"
-              class="ov-li flex items-center justify-between w-full px-3.5 py-2.5 text-xs border-b border-default"
+              class="ov-li flex items-center justify-between w-full px-3.5 py-3 text-sm border-b border-default"
               @click="openRecord(t.date)"
             >
               <span class="font-semibold font-mono"
@@ -406,14 +406,14 @@ onUnmounted(() => {
 
         <!-- 高偏差待複習 -->
         <div class="rounded-2xl border border-default bg-default overflow-hidden">
-          <h4 class="flex justify-between items-center px-3.5 py-2.5 text-xs bg-elevated border-b border-default font-semibold">
+          <h4 class="flex justify-between items-center px-3.5 py-3 text-sm bg-elevated border-b border-default font-semibold">
             高偏差待複習 <span class="text-dimmed font-normal text-[10px]">少賺 &gt; 多賠</span>
           </h4>
           <div class="ov-list max-h-[280px] overflow-y-auto">
             <button
               v-for="h in summary.heat.slice(0, 20)"
               :key="h.date"
-              class="ov-li flex items-center justify-between w-full px-3.5 py-2.5 text-xs border-b border-default"
+              class="ov-li flex items-center justify-between w-full px-3.5 py-3 text-sm border-b border-default"
               @click="openRecord(h.date)"
             >
               <span class="font-semibold font-mono"
@@ -445,29 +445,29 @@ button:not(:disabled) {
   top: 0;
   z-index: 5;
   background: var(--ui-bg);
-  padding-top: 12px;
+  padding-top: 14px;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
+  gap: 10px;
   border-bottom: 1px solid var(--ui-border);
 }
 .ov-weekhead div {
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ui-text-dimmed);
   font-weight: 600;
-  padding-bottom: 9px;
+  padding-bottom: 10px;
 }
 .ov-week {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 .ov-cell {
-  min-height: 74px;
-  border-radius: 10px;
-  padding: 7px 9px;
+  min-height: 90px;
+  border-radius: 12px;
+  padding: 9px 11px;
   border: 1px solid transparent;
   color: var(--ui-text);
   display: flex;
@@ -498,11 +498,11 @@ button:not(:disabled) {
   gap: 4px;
 }
 .ov-dnum {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
 }
 .ov-wlt {
-  font-size: 13px;
+  font-size: 15px;
   opacity: 0.92;
 }
 
@@ -529,9 +529,9 @@ button:not(:disabled) {
 /* 狀態 tag（小膠囊，帶色，可疊在任何底色上） */
 .ov-tag {
   display: inline-block;
-  font-size: 11px;
-  line-height: 1.6;
-  padding: 1px 8px;
+  font-size: 12px;
+  line-height: 1.65;
+  padding: 2px 9px;
   border-radius: 999px;
   font-weight: 600;
   white-space: nowrap;
