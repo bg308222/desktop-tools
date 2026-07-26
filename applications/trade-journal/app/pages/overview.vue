@@ -448,27 +448,28 @@ button:not(:disabled) {
   padding-top: 12px;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 7px;
+  gap: 8px;
   border-bottom: 1px solid var(--ui-border);
 }
 .ov-weekhead div {
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ui-text-dimmed);
   font-weight: 600;
-  padding-bottom: 8px;
+  padding-bottom: 9px;
 }
 .ov-week {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 7px;
-  margin-bottom: 7px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 .ov-cell {
-  min-height: 60px;
-  border-radius: 8px;
-  padding: 5px 7px;
+  min-height: 74px;
+  border-radius: 10px;
+  padding: 7px 9px;
   border: 1px solid transparent;
+  color: var(--ui-text);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -497,11 +498,11 @@ button:not(:disabled) {
   gap: 4px;
 }
 .ov-dnum {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 .ov-wlt {
-  font-size: 11px;
+  font-size: 13px;
   opacity: 0.92;
 }
 
@@ -517,20 +518,20 @@ button:not(:disabled) {
   color: var(--ui-text-dimmed);
 }
 
-/* 偏差熱度底色（僅已復盤的日子）（淺色） */
-.h-0 { background: #f0fdf4; border-color: #dcfce7; }
-.h-1 { background: #fff7ed; border-color: #fed7aa; }
-.h-2 { background: #ffedd5; border-color: #fdba74; }
-.h-3 { background: #fecaca; border-color: #fca5a5; }
+/* 偏差熱度底色（僅已復盤的日子）：兩主題共用同一組淺色 chip，明確指定文字色確保可讀 */
+.h-0 { background: #f0fdf4; border-color: #dcfce7; color: #14532d; }
+.h-1 { background: #fff7ed; border-color: #fed7aa; color: #7c2d12; }
+.h-2 { background: #ffedd5; border-color: #fdba74; color: #7c2d12; }
+.h-3 { background: #fecaca; border-color: #fca5a5; color: #7f1d1d; }
 .h-4 { background: #f87171; border-color: #ef4444; color: #450a0a; }
 .h-5 { background: #dc2626; border-color: #b91c1c; color: #fff; }
 
 /* 狀態 tag（小膠囊，帶色，可疊在任何底色上） */
 .ov-tag {
   display: inline-block;
-  font-size: 9.5px;
-  line-height: 1.5;
-  padding: 0 6px;
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 1px 8px;
   border-radius: 999px;
   font-weight: 600;
   white-space: nowrap;
@@ -599,18 +600,8 @@ button:not(:disabled) {
   background-clip: padding-box;
 }
 
-/* 暗色覆蓋 */
-:global(.dark) .h-0 { background: #0f2417; border-color: #16432a; }
-:global(.dark) .h-1 { background: #2a1c0a; border-color: #4a3212; }
-:global(.dark) .h-2 { background: #3a230a; border-color: #6b3e10; }
-:global(.dark) .h-3 { background: #4a1414; border-color: #7a1f1f; }
-:global(.dark) .h-4 { background: #dc2626; border-color: #ef4444; color: #fff; }
-:global(.dark) .h-5 { background: #b91c1c; border-color: #f87171; color: #fff; }
-:global(.dark) .t-empty { background: #3f3f46; color: #d4d4d8; }
-:global(.dark) .t-recorded { background: #57430d; color: #fcd34d; }
-:global(.dark) .t-reviewed { background: #16432a; color: #6ee7a8; }
-:global(.dark) .t-notrade,
-:global(.dark) .t-notrade_reviewed { background: #1e3a63; color: #93c5fd; }
+/* 暗色：熱度與 tag 兩主題共用淺色 chip（已在上方指定文字色，深色下不覆蓋）；
+   僅面板文字（少/多標色）需要調亮以在深底上維持對比 */
 :global(.dark) .ov-mk { color: #f87171; }
 :global(.dark) .ov-ok { color: #fbbf24; }
 </style>
