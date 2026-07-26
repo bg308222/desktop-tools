@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { EntryWithPresence, Market } from '../../shared/domain'
+import type { EntryStatus, EntryWithPresence, Market } from '../../shared/domain'
 import { deriveStatus } from '../lib/completeness'
 import { deviation, heatLevel } from '../lib/deviation'
 import { summarize } from '../lib/overviewStats'
@@ -11,15 +11,21 @@ const router = useRouter()
 
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 const wd = (d: string) => '週' + WEEKDAY[dayjs(d).day()]
-const isWeekend = (d: dayjs.Dayjs) => d.day() === 0 || d.day() === 6
 const today = dayjs().format('YYYY-MM-DD')
 const FAR_PAST = '1970-01-01'
+
+const TAG_LABEL: Record<EntryStatus, string> = {
+  empty: '待記錄',
+  recorded: '待復盤',
+  reviewed: '已復盤',
+  notrade: '空手',
+  notrade_reviewed: '空手✓',
+}
 
 const loaded = ref(false)
 const markets = ref<Market[]>([])
 const curMarket = ref<string | null>(null)
 const entries = ref<Map<string, EntryWithPresence>>(new Map())
-const mode = ref<'status' | 'heat'>('status')
 const menuOpen = ref(false)
 
 // 區間
@@ -78,6 +84,10 @@ function moveMarket(dir: 1 | -1) {
   if (o.length < 2) return
   void setMarket(o[(curIndex.value + dir + o.length) % o.length]!)
 }
+function pickMarket(id: string) {
+  menuOpen.value = false
+  void setMarket(id)
+}
 
 // ── 連續月曆：從最早有資料的月，到本月月底 ──
 function mondayOf(d: dayjs.Dayjs) {
@@ -115,28 +125,24 @@ const calItems = computed<CalItem[]>(() => {
 })
 
 interface CellView {
-  status: string
-  cls: string
-  info: string
-  isMiss: boolean
+  status: EntryStatus
+  label: string
+  bgClass: string
+  wlt: string
+  title: string
 }
 function cellView(date: string): CellView {
   const e = entries.value.get(date)
   const status = e ? deriveStatus(e, e.images) : 'empty'
-  if (mode.value === 'status') {
-    let info = '—'
-    if (e && (status === 'reviewed' || status === 'recorded'))
-      info = e.actual ? `${e.actual.w}W ${e.actual.l}L` : ''
-    else if (status === 'notrade' || status === 'notrade_reviewed') info = '空手'
-    return { status, cls: 'st-' + status, info, isMiss: false }
-  }
-  // heat
   const dev = e ? deviation(e) : null
-  if (dev) return { status, cls: 'h-' + heatLevel(dev.miss), info: `${dev.miss}·${dev.over}`, isMiss: true }
-  if (status === 'notrade' || status === 'notrade_reviewed')
-    return { status, cls: 'st-notrade', info: '空手', isMiss: false }
-  if (status === 'recorded') return { status, cls: 'st-recorded', info: '待復盤', isMiss: false }
-  return { status, cls: 'st-empty', info: '—', isMiss: false }
+  const bgClass = dev ? 'h-' + heatLevel(dev.miss) : status === 'empty' ? 'cell-empty' : 'cell-plain'
+  let wlt = ''
+  if (status === 'notrade' || status === 'notrade_reviewed') wlt = '空手'
+  else if (e?.actual) wlt = `${e.actual.w}W ${e.actual.l}L`
+  const title =
+    `${dayjs(date).format('M/D')} ${wd(date)}｜${TAG_LABEL[status]}` +
+    (dev ? `｜少${dev.miss} · 多${dev.over}` : '')
+  return { status, label: TAG_LABEL[status], bgClass, wlt, title }
 }
 
 // ── 右側統計 ──
@@ -230,88 +236,72 @@ onUnmounted(() => {
             :key="m.id"
             class="px-3 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-elevated"
             :class="m.id === curMarket ? 'text-primary font-semibold' : ''"
-            @click.stop="setMarket(m.id); menuOpen = false"
+            @click.stop="pickMarket(m.id)"
           >
             {{ m.name }}<span v-if="m.archived" class="text-dimmed text-xs">（已封存）</span>
           </div>
         </div>
       </div>
 
-      <div class="flex items-center gap-4">
-        <button class="text-xs text-primary font-semibold" @click="scrollToToday(true)">
-          ↓ 回到今天
-        </button>
-        <div class="flex border border-default rounded-lg overflow-hidden text-xs">
-          <button
-            class="px-3.5 py-1.5 font-medium"
-            :class="mode === 'status' ? 'bg-primary text-inverted' : 'text-dimmed'"
-            @click="mode = 'status'"
-          >
-            狀態
-          </button>
-          <button
-            class="px-3.5 py-1.5 font-medium"
-            :class="mode === 'heat' ? 'bg-primary text-inverted' : 'text-dimmed'"
-            @click="mode = 'heat'"
-          >
-            偏差熱度
-          </button>
-        </div>
-      </div>
+      <button class="text-xs text-primary font-semibold" @click="scrollToToday(true)">
+        ↓ 回到今天
+      </button>
     </div>
 
     <!-- 主體 -->
     <div class="flex-1 min-h-0 grid grid-cols-[1fr_328px] gap-3.5 p-3.5">
-      <!-- 月曆 -->
-      <div ref="calEl" class="ov-cal rounded-2xl border border-default bg-default overflow-y-auto px-3.5 pb-4">
-        <div class="ov-weekhead">
-          <div v-for="w in ['一', '二', '三', '四', '五']" :key="w">{{ w }}</div>
-        </div>
-        <template v-for="it in calItems" :key="it.key">
-          <div v-if="it.kind === 'sep'" class="flex items-center gap-2.5 mt-4 mb-2">
-            <span class="font-bold text-[13px] text-dimmed whitespace-nowrap">{{ it.label }}</span>
-            <span class="flex-1 h-px bg-[var(--ui-border)]" />
+      <!-- 月曆面板：可捲區 + 固定圖例 -->
+      <div class="ov-cal-panel flex flex-col min-h-0 rounded-2xl border border-default bg-default overflow-hidden">
+        <div ref="calEl" class="ov-cal flex-1 min-h-0 overflow-y-auto px-3.5 pb-3">
+          <div class="ov-weekhead">
+            <div v-for="w in ['一', '二', '三', '四', '五']" :key="w">{{ w }}</div>
           </div>
-          <div v-else class="ov-week">
-            <template v-for="(d, i) in it.days" :key="i">
-              <div v-if="!d" class="ov-cell void" />
-              <button
-                v-else
-                class="ov-cell"
-                :class="[cellView(d).cls, { today: d === today }]"
-                :title="`${dayjs(d).format('M/D')} ${wd(d)}`"
-                @click="openRecord(d)"
-              >
-                <span class="ov-dnum">{{ dayjs(d).date() }}</span>
-                <span class="ov-info font-mono" :class="{ 'ov-miss': cellView(d).isMiss }">{{
-                  cellView(d).info
-                }}</span>
-              </button>
-            </template>
-          </div>
-        </template>
-
-        <!-- 圖例 -->
-        <div class="flex items-center gap-3 flex-wrap text-[11px] text-dimmed mt-3 pt-3 border-t border-default">
-          <template v-if="mode === 'status'">
-            <span><i class="ov-lg st-reviewed" />已復盤</span>
-            <span><i class="ov-lg st-recorded" />待復盤</span>
-            <span><i class="ov-lg st-notrade" />空手</span>
-            <span><i class="ov-lg st-empty" />待記錄</span>
-            <span class="ml-auto">只顯示交易日（一～五）</span>
+          <template v-for="it in calItems" :key="it.key">
+            <div v-if="it.kind === 'sep'" class="flex items-center gap-2.5 mt-4 mb-2">
+              <span class="font-bold text-[13px] text-dimmed whitespace-nowrap">{{ it.label }}</span>
+              <span class="flex-1 h-px bg-[var(--ui-border)]" />
+            </div>
+            <div v-else class="ov-week">
+              <template v-for="(d, i) in it.days" :key="i">
+                <div v-if="!d" class="ov-cell void" />
+                <button
+                  v-else
+                  class="ov-cell"
+                  :class="[cellView(d).bgClass, { today: d === today }]"
+                  :title="cellView(d).title"
+                  @click="openRecord(d)"
+                >
+                  <div class="ov-top">
+                    <span class="ov-dnum">{{ dayjs(d).date() }}</span>
+                    <span class="ov-tag" :class="'t-' + cellView(d).status">{{
+                      cellView(d).label
+                    }}</span>
+                  </div>
+                  <span class="ov-wlt font-mono">{{ cellView(d).wlt }}</span>
+                </button>
+              </template>
+            </div>
           </template>
-          <template v-else>
-            <span>少賺 W：</span>
+        </div>
+
+        <!-- 圖例：固定在底部，不隨捲動消失 -->
+        <div class="ov-legend flex items-center gap-x-3 gap-y-1.5 flex-wrap text-[11px] text-dimmed px-3.5 py-2.5 border-t border-default">
+          <span class="ov-tag t-reviewed">已復盤</span>
+          <span class="ov-tag t-recorded">待復盤</span>
+          <span class="ov-tag t-notrade">空手</span>
+          <span class="ov-tag t-empty">待記錄</span>
+          <span class="flex items-center gap-1 ml-1">
+            <span>背景=少賺熱度</span>
             <span class="flex">
               <i class="ov-sc h-0" /><i class="ov-sc h-1" /><i class="ov-sc h-2" /><i
                 class="ov-sc h-3"
               /><i class="ov-sc h-4" /><i class="ov-sc h-5" />
             </span>
-            <span>0 → 5+</span>
-            <span class="ml-auto"
-              ><b class="ov-mk">少</b>=會做但沒有 · <b class="ov-ok">多</b>=不該做卻做</span
-            >
-          </template>
+            <span>0→5+</span>
+          </span>
+          <span class="ml-auto"
+            ><b class="ov-mk">少</b>=會做但沒有 · <b class="ov-ok">多</b>=不該做卻做</span
+          >
         </div>
       </div>
 
@@ -325,7 +315,11 @@ onUnmounted(() => {
                 v-for="r in (['7', '30', '90', 'custom'] as const)"
                 :key="r"
                 class="text-[11px] px-2.5 py-1 rounded-full border"
-                :class="rangeMode === r ? 'bg-primary text-inverted border-primary font-semibold' : 'border-default text-dimmed'"
+                :class="
+                  rangeMode === r
+                    ? 'bg-primary text-inverted border-primary font-semibold'
+                    : 'border-default text-dimmed'
+                "
                 @click="rangeMode = r"
               >
                 {{ { '7': '近一週', '30': '近一個月', '90': '近三個月', custom: '自訂…' }[r] }}
@@ -334,7 +328,13 @@ onUnmounted(() => {
             <div v-if="rangeMode === 'custom'" class="flex items-center gap-1.5 mt-2 text-xs">
               <input v-model="customFrom" type="date" class="ov-dateinput" :max="customTo" />
               <span class="text-dimmed">–</span>
-              <input v-model="customTo" type="date" class="ov-dateinput" :min="customFrom" :max="today" />
+              <input
+                v-model="customTo"
+                type="date"
+                class="ov-dateinput"
+                :min="customFrom"
+                :max="today"
+              />
             </div>
             <div v-else class="mt-2 text-[11px] text-dimmed font-mono">
               {{ rangeStart.replace(/-/g, '/') }} – {{ rangeEnd.replace(/-/g, '/') }}
@@ -344,7 +344,10 @@ onUnmounted(() => {
             <div class="p-3.5 border-t border-r border-default">
               <div class="text-[10px] uppercase text-dimmed">已復盤/有紀錄</div>
               <div class="text-xl font-bold mt-0.5">
-                {{ summary.stats.reviewedDays }}<small class="text-xs text-dimmed font-medium">/{{ summary.stats.recordedDays }}</small>
+                {{ summary.stats.reviewedDays
+                }}<small class="text-xs text-dimmed font-medium"
+                  >/{{ summary.stats.recordedDays }}</small
+                >
               </div>
             </div>
             <div class="p-3.5 border-t border-default">
@@ -355,17 +358,22 @@ onUnmounted(() => {
               <div class="text-[10px] uppercase text-dimmed">少賺 / 多賠</div>
               <div class="flex gap-3.5 items-baseline mt-0.5">
                 <span class="text-xl font-bold ov-mk"
-                  >{{ summary.stats.missSum }}<small class="block text-[9px] text-dimmed font-medium">少賺W</small></span
+                  >{{ summary.stats.missSum
+                  }}<small class="block text-[9px] text-dimmed font-medium">少賺W</small></span
                 >
                 <span class="text-base font-bold ov-ok"
-                  >{{ summary.stats.overSum }}<small class="block text-[9px] text-dimmed font-medium">多賠L</small></span
+                  >{{ summary.stats.overSum
+                  }}<small class="block text-[9px] text-dimmed font-medium">多賠L</small></span
                 >
               </div>
             </div>
             <div class="p-3.5 border-t border-default">
               <div class="text-[10px] uppercase text-dimmed">實際/理想勝率</div>
               <div class="text-xl font-bold mt-0.5">
-                {{ pct(summary.stats.actualWinRate) }}<small class="text-xs text-dimmed font-medium">/{{ pct(summary.stats.idealWinRate) }}</small>
+                {{ pct(summary.stats.actualWinRate)
+                }}<small class="text-xs text-dimmed font-medium"
+                  >/{{ pct(summary.stats.idealWinRate) }}</small
+                >
               </div>
             </div>
           </div>
@@ -383,8 +391,12 @@ onUnmounted(() => {
               class="ov-li flex items-center justify-between w-full px-3.5 py-2.5 text-xs border-b border-default"
               @click="openRecord(t.date)"
             >
-              <span class="font-semibold font-mono">{{ dayjs(t.date).format('M/D') }} {{ wd(t.date) }}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded-full st-recorded">{{ t.notrade ? '空手待復盤' : '待復盤' }}</span>
+              <span class="font-semibold font-mono"
+                >{{ dayjs(t.date).format('M/D') }} {{ wd(t.date) }}</span
+              >
+              <span class="ov-tag" :class="t.notrade ? 't-notrade' : 't-recorded'">{{
+                t.notrade ? '空手待復盤' : '待復盤'
+              }}</span>
             </button>
             <div v-if="!summary.todo.length" class="text-center text-dimmed text-xs py-4">
               此區間沒有待復盤 🎉
@@ -404,7 +416,9 @@ onUnmounted(() => {
               class="ov-li flex items-center justify-between w-full px-3.5 py-2.5 text-xs border-b border-default"
               @click="openRecord(h.date)"
             >
-              <span class="font-semibold font-mono">{{ dayjs(h.date).format('M/D') }} {{ wd(h.date) }}</span>
+              <span class="font-semibold font-mono"
+                >{{ dayjs(h.date).format('M/D') }} {{ wd(h.date) }}</span
+              >
               <span class="font-mono text-[11px]"
                 ><b class="ov-mk">少{{ h.miss }}</b> · <b class="ov-ok">多{{ h.over }}</b></span
               >
@@ -420,6 +434,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* 所有可點控制項顯示 pointer */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 /* 週標題吸頂 */
 .ov-weekhead {
   position: sticky;
@@ -446,16 +465,14 @@ onUnmounted(() => {
   margin-bottom: 7px;
 }
 .ov-cell {
-  min-height: 52px;
+  min-height: 60px;
   border-radius: 8px;
-  padding: 5px 8px;
+  padding: 5px 7px;
   border: 1px solid transparent;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  align-items: flex-start;
   text-align: left;
-  cursor: pointer;
   transition:
     transform 0.06s,
     box-shadow 0.1s;
@@ -468,48 +485,39 @@ onUnmounted(() => {
   background: transparent;
   border-color: transparent;
   cursor: default;
-  min-height: 52px;
 }
 .ov-cell.void:hover {
   transform: none;
   box-shadow: none;
 }
+.ov-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
 .ov-dnum {
   font-size: 12px;
   font-weight: 700;
 }
-.ov-info {
-  font-size: 10.5px;
-  opacity: 0.9;
-}
-.ov-cell.today {
-  outline: 2px solid var(--ui-primary);
-  outline-offset: 1px;
+.ov-wlt {
+  font-size: 11px;
+  opacity: 0.92;
 }
 
-/* 狀態色（淺色） */
-.st-empty {
-  background: #f4f4f5;
-  color: #a1a1aa;
-  border-color: #e4e4e7;
+/* 中性底（無偏差資料的日子） */
+.cell-plain {
+  background: var(--ui-bg-elevated);
+  border-color: var(--ui-border);
 }
-.st-recorded {
-  background: #fef3c7;
-  color: #92400e;
-  border-color: #fde68a;
+.cell-empty {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--ui-border);
+  color: var(--ui-text-dimmed);
 }
-.st-reviewed {
-  background: #dcfce7;
-  color: #166534;
-  border-color: #bbf7d0;
-}
-.st-notrade,
-.st-notrade_reviewed {
-  background: #dbeafe;
-  color: #1e40af;
-  border-color: #bfdbfe;
-}
-/* 熱度色（淺色） */
+
+/* 偏差熱度底色（僅已復盤的日子）（淺色） */
 .h-0 { background: #f0fdf4; border-color: #dcfce7; }
 .h-1 { background: #fff7ed; border-color: #fed7aa; }
 .h-2 { background: #ffedd5; border-color: #fdba74; }
@@ -517,24 +525,30 @@ onUnmounted(() => {
 .h-4 { background: #f87171; border-color: #ef4444; color: #450a0a; }
 .h-5 { background: #dc2626; border-color: #b91c1c; color: #fff; }
 
+/* 狀態 tag（小膠囊，帶色，可疊在任何底色上） */
+.ov-tag {
+  display: inline-block;
+  font-size: 9.5px;
+  line-height: 1.5;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.t-empty { background: #e4e4e7; color: #52525b; }
+.t-recorded { background: #fde68a; color: #78350f; }
+.t-reviewed { background: #bbf7d0; color: #14532d; }
+.t-notrade,
+.t-notrade_reviewed { background: #bfdbfe; color: #1e3a8a; }
+
 /* 少/多 標色 */
 .ov-mk { color: #b91c1c; font-weight: 700; }
 .ov-ok { color: #b45309; }
-.ov-miss { font-weight: 600; }
 
-/* 圖例小方塊 */
-.ov-lg {
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
-  display: inline-block;
-  vertical-align: -1px;
-  margin-right: 4px;
-  border: 1px solid;
-}
+/* 圖例熱度刻度 */
 .ov-sc {
-  width: 18px;
-  height: 12px;
+  width: 16px;
+  height: 11px;
   display: inline-block;
 }
 .ov-sc.h-0 { border-radius: 3px 0 0 3px; }
@@ -586,17 +600,17 @@ onUnmounted(() => {
 }
 
 /* 暗色覆蓋 */
-:global(.dark) .st-empty { background: #1c1c1f; color: #6b6b73; border-color: #27272a; }
-:global(.dark) .st-recorded { background: #3a2c08; color: #fcd34d; border-color: #57430d; }
-:global(.dark) .st-reviewed { background: #0f2e1a; color: #4ade80; border-color: #16432a; }
-:global(.dark) .st-notrade,
-:global(.dark) .st-notrade_reviewed { background: #111d3a; color: #93c5fd; border-color: #1e3a63; }
 :global(.dark) .h-0 { background: #0f2417; border-color: #16432a; }
 :global(.dark) .h-1 { background: #2a1c0a; border-color: #4a3212; }
 :global(.dark) .h-2 { background: #3a230a; border-color: #6b3e10; }
 :global(.dark) .h-3 { background: #4a1414; border-color: #7a1f1f; }
 :global(.dark) .h-4 { background: #dc2626; border-color: #ef4444; color: #fff; }
 :global(.dark) .h-5 { background: #b91c1c; border-color: #f87171; color: #fff; }
+:global(.dark) .t-empty { background: #3f3f46; color: #d4d4d8; }
+:global(.dark) .t-recorded { background: #57430d; color: #fcd34d; }
+:global(.dark) .t-reviewed { background: #16432a; color: #6ee7a8; }
+:global(.dark) .t-notrade,
+:global(.dark) .t-notrade_reviewed { background: #1e3a63; color: #93c5fd; }
 :global(.dark) .ov-mk { color: #f87171; }
 :global(.dark) .ov-ok { color: #fbbf24; }
 </style>
