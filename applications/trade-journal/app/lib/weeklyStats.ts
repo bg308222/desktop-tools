@@ -39,11 +39,11 @@ function addGroup(g: WltGroup, e: Entry): void {
 }
 
 /**
- * 輸贏失衡判定：n 倍的輸大於贏就算失衡（平手 T 不參與）。
- * 用來標示「這週理想上該做的單，賠的比例過高」。相等不算失衡。
+ * 淨虧判定。賺賠比 r 的定義：輸一次成本為 1，贏一次淨賺 r（不含成本）。
+ * 因此損益 = r×W − L，當 L > r×W 即為淨虧。剛好打平不算，平手 T 不參與。
  */
-export function isLossHeavy(v: Wlt, n: number): boolean {
-  return n * v.l > v.w
+export function isNetLoss(v: Wlt, r: number): boolean {
+  return v.l > r * v.w
 }
 
 /** 該日所屬那週的週一（週一起始）。 */

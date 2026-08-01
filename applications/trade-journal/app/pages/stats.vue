@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import { weeklyStats, isLossHeavy, type WeekStat } from '../lib/weeklyStats'
+import { weeklyStats, isNetLoss, type WeekStat } from '../lib/weeklyStats'
 import type { Wlt } from '../../shared/domain'
 
 const api = useApi()
 const FAR_PAST = '1970-01-01'
-/** 失衡倍率 n 的存放位置；只是個人偏好，放 localStorage 就夠。 */
-const RATIO_KEY = 'trade-journal:stats-loss-ratio'
-const DEFAULT_RATIO = 2
+/** 賺賠比 R 的存放位置；只是個人偏好，放 localStorage 就夠。 */
+const RR_KEY = 'trade-journal:stats-rr'
+const DEFAULT_RR = 2
 
 const KINDS = [
   { key: 'actual', label: '實際' },
@@ -18,11 +18,11 @@ const KINDS = [
 const loaded = ref(false)
 const weeks = ref<WeekStat[]>([])
 const open = ref<Set<string>>(new Set())
-const ratio = ref(DEFAULT_RATIO)
+const rr = ref(DEFAULT_RR)
 
 onMounted(async () => {
-  const saved = Number(localStorage.getItem(RATIO_KEY))
-  if (Number.isFinite(saved) && saved > 0) ratio.value = saved
+  const saved = Number(localStorage.getItem(RR_KEY))
+  if (Number.isFinite(saved) && saved > 0) rr.value = saved
 
   const today = dayjs().format('YYYY-MM-DD')
   const [markets, entries] = await Promise.all([
@@ -35,14 +35,15 @@ onMounted(async () => {
   loaded.value = true
 })
 
-watch(ratio, (v) => {
-  if (Number.isFinite(v) && v > 0) localStorage.setItem(RATIO_KEY, String(v))
+watch(rr, (v) => {
+  if (Number.isFinite(v) && v > 0) localStorage.setItem(RR_KEY, String(v))
 })
 
 const label = (wk: WeekStat) => `${dayjs(wk.start).format('M/D')} – ${dayjs(wk.end).format('M/D')}`
 /** 拆成三格輸出，讓 W/L/T 各自佔固定寬度、不論位數都對齊。 */
 const cells = (v: Wlt) => [`${v.w}W`, `${v.l}L`, `${v.t}T`]
-const alert = (wk: WeekStat) => isLossHeavy(wk.ideal, ratio.value)
+/** 用理想 WLT 判斷該週是否淨虧（L > R×W）。 */
+const alert = (wk: WeekStat) => isNetLoss(wk.ideal, rr.value)
 
 function toggle(start: string) {
   const next = new Set(open.value)
@@ -60,9 +61,9 @@ function toggle(start: string) {
       <div class="flex items-center gap-2 flex-wrap">
         <p class="font-semibold">週統計</p>
         <span class="flex-1" />
-        <span class="text-sm text-dimmed">理想</span>
-        <UInput v-model.number="ratio" type="number" min="1" step="1" class="w-20" size="sm" />
-        <span class="text-sm text-dimmed">倍的輸大於贏就標示</span>
+        <span class="text-sm text-dimmed">賺賠比 R</span>
+        <UInput v-model.number="rr" type="number" min="0.1" step="0.1" class="w-24" size="sm" />
+        <span class="text-sm text-dimmed">理想淨虧（L &gt; R×W）的週標示</span>
       </div>
 
       <p v-if="loaded && !weeks.length" class="text-sm text-dimmed py-8 text-center">
@@ -85,7 +86,7 @@ function toggle(start: string) {
           />
           <span class="text-lg font-semibold">{{ label(wk) }}</span>
           <UBadge v-if="wk.isCurrent" variant="soft">本週</UBadge>
-          <UBadge v-if="alert(wk)" color="warning" variant="soft">輸贏失衡</UBadge>
+          <UBadge v-if="alert(wk)" color="warning" variant="soft">淨虧</UBadge>
         </button>
 
         <div class="px-4 pb-3 flex flex-col gap-1.5">
@@ -133,7 +134,7 @@ function toggle(start: string) {
   font-variant-numeric: tabular-nums;
 }
 
-/* 輸贏失衡：琥珀色淡底，亮/暗色模式都看得出來又不刺眼 */
+/* 淨虧的週：琥珀色淡底，亮/暗色模式都看得出來又不刺眼 */
 .wk-alert {
   background: rgb(245 158 11 / 0.1);
   border-color: rgb(245 158 11 / 0.45);
