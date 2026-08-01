@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import { parseDate, type DateValue } from '@internationalized/date'
-import type { Entry, ImageKind, Market } from '../../shared/domain'
+import type { Entry, ImageKind, Market, Wlt } from '../../shared/domain'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { datesForMarket, marketsForDate, stepIndex } from '../lib/viewerNav'
 import { deriveStatus } from '../lib/completeness'
@@ -210,6 +210,14 @@ const realStatus = computed(() =>
 )
 const empty = computed(() => !curMarket.value || !curDate.value)
 
+const WLT_KINDS = [
+  { key: 'actual', label: '實際' },
+  { key: 'ideal', label: '理想' },
+  { key: 'would', label: '會做' },
+] as const
+/** 未填的組顯示破折號，不要湊 0 混淆「真的是 0」與「還沒填」。 */
+const fmtWlt = (v: Wlt | null) => (v ? `${v.w}W ${v.l}L ${v.t}T` : '—')
+
 const KIND_KEY: Record<ImageKind, string> = { trade: '1', raw: '2', review: '3' }
 const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ? '原圖' : '復盤圖')
 </script>
@@ -319,6 +327,15 @@ const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ?
         <datalist id="viewer-tag-suggestions">
           <option v-for="t in allTags" :key="t.id" :value="t.name" />
         </datalist>
+      </div>
+
+      <div v-if="!empty" class="flex items-center gap-4 ml-auto pl-3 border-l border-default">
+        <div v-for="k in WLT_KINDS" :key="k.key" class="flex items-baseline gap-1.5">
+          <span class="text-xs font-medium text-dimmed">{{ k.label }}</span>
+          <span class="text-sm font-mono tabular-nums whitespace-nowrap">{{
+            fmtWlt(curEntry?.[k.key] ?? null)
+          }}</span>
+        </div>
       </div>
     </div>
 
