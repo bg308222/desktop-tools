@@ -4,6 +4,7 @@ import { parseDate, type DateValue } from '@internationalized/date'
 import type { Entry, ImageKind, Market, Tag, Wlt } from '../../shared/domain'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
+import { isPickedFromList } from '../lib/tagInput'
 
 const api = useApi()
 const session = useSession()
@@ -109,6 +110,11 @@ function addTag() {
   const n = tagDraft.value.trim()
   tagDraft.value = ''
   if (n && !tagNames.value.includes(n)) void commitTags([...tagNames.value, n])
+}
+/** 從建議清單選到既有標籤時直接上標，不必再按 Enter。 */
+function onDraftInput(e: Event) {
+  const names = allTags.value.map((t) => t.name)
+  if (isPickedFromList((e as InputEvent).inputType, tagDraft.value, names)) addTag()
 }
 function removeTag(n: string) {
   void commitTags(tagNames.value.filter((t) => t !== n))
@@ -357,8 +363,9 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
                 <input
                   v-model="tagDraft"
                   list="tag-suggestions"
-                  placeholder="輸入後 Enter 新增"
+                  placeholder="選取即上，新標籤按 Enter"
                   class="rounded-md border border-default bg-default px-2 py-1 text-sm min-w-[160px]"
+                  @input="onDraftInput"
                   @keydown.enter.prevent="addTag"
                 />
                 <datalist id="tag-suggestions">
