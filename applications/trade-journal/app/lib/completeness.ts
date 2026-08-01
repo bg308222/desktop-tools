@@ -1,23 +1,18 @@
 import type { Entry, EntryStatus, ImagePresence } from '../../shared/domain'
 
 /**
- * 由 entry 欄位與圖片存在狀態推導完成度：
- * - empty：無 entry，或交易圖與實際 WLT 皆缺
- * - recorded：交易圖 + 實際 WLT 齊，但復盤資料未齊
- * - reviewed：三張圖 + 實際/理想 WLT 皆齊
+ * 由圖片存在狀態推導完成度，只看兩件事：
+ * - 交易圖是否存在 → 當天有沒有交易
+ * - 復盤組（raw + review 皆有）是否齊 → 有沒有復盤
+ *
+ * 空手旗標只在兩者皆無時，用來分辨「主動宣告空手」與「還沒開始記」。
+ * actual/ideal/would 不參與判定——缺漏由 warning 呈現，不降級狀態。
  */
 export function deriveStatus(entry: Entry | null, images: ImagePresence): EntryStatus {
   if (!entry) return 'empty'
 
-  // 空手日：交易圖/實際 WLT 不適用；復盤齊（原圖+復盤圖+理想 WLT）→ 已復盤
-  if (entry.noTrade) {
-    const reviewed = images.raw && images.review && entry.ideal != null
-    return reviewed ? 'notrade_reviewed' : 'notrade'
-  }
-
-  const hasRecorded = images.trade && entry.actual != null
-  if (!hasRecorded) return 'empty'
-
-  const hasReviewed = images.raw && images.review && entry.ideal != null
-  return hasReviewed ? 'reviewed' : 'recorded'
+  const reviewed = images.raw && images.review
+  if (images.trade) return reviewed ? 'reviewed' : 'recorded'
+  if (reviewed) return 'notrade_reviewed'
+  return entry.noTrade ? 'notrade' : 'empty'
 }
