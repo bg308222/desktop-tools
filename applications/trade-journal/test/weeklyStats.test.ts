@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { weeklyStats } from '../app/lib/weeklyStats'
+import { weeklyStats, isLossHeavy } from '../app/lib/weeklyStats'
 import type { Entry, Market, Wlt } from '../shared/domain'
 
 function entry(tradeDate: string, marketId: string, partial: Partial<Entry> = {}): Entry {
@@ -113,5 +113,35 @@ describe('weeklyStats', () => {
   it('marketId 找不到對應市場時略過該筆', () => {
     const es = [entry('2026-07-27', 'ghost', { actual: w(9, 9, 9) })]
     expect(weeklyStats(es, MARKETS, '2026-07-29')).toEqual([])
+  })
+})
+
+/** 輸贏失衡判定：n 倍的輸大於贏就算失衡（用理想 WLT）。 */
+describe('isLossHeavy', () => {
+  it('n×L 大於 W → true', () => {
+    expect(isLossHeavy(w(3, 8, 1), 2)).toBe(true) // 16 > 3
+    expect(isLossHeavy(w(11, 8, 0), 2)).toBe(true) // 16 > 11
+  })
+
+  it('n×L 小於 W → false', () => {
+    expect(isLossHeavy(w(20, 8, 0), 2)).toBe(false) // 16 < 20
+  })
+
+  it('剛好相等不算失衡', () => {
+    expect(isLossHeavy(w(4, 2, 0), 2)).toBe(false) // 4 > 4 為 false
+  })
+
+  it('沒有輸 → 永遠 false', () => {
+    expect(isLossHeavy(w(0, 0, 0), 2)).toBe(false)
+    expect(isLossHeavy(w(5, 0, 0), 99)).toBe(false)
+  })
+
+  it('n 越大越容易觸發', () => {
+    expect(isLossHeavy(w(10, 3, 0), 3)).toBe(false) // 9 < 10
+    expect(isLossHeavy(w(10, 3, 0), 4)).toBe(true) // 12 > 10
+  })
+
+  it('T 不參與判定', () => {
+    expect(isLossHeavy(w(10, 3, 999), 3)).toBe(false)
   })
 })
