@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import type { EntryStatus, EntryWithPresence, Market } from '../../shared/domain'
-import { deriveStatus } from '../lib/completeness'
+import { deriveStatus, warnings } from '../lib/completeness'
 import { deviation, heatLevel } from '../lib/deviation'
 import { summarize } from '../lib/overviewStats'
 
@@ -130,11 +130,13 @@ interface CellView {
   bgClass: string
   wlt: string
   devText: string
+  warns: string[]
   title: string
 }
 function cellView(date: string): CellView {
   const e = entries.value.get(date)
   const status = e ? deriveStatus(e, e.images) : 'empty'
+  const warns = e ? warnings(e, e.images) : []
   const dev = e ? deviation(e) : null
   const bgClass = dev ? 'h-' + heatLevel(dev.miss) : status === 'empty' ? 'cell-empty' : 'cell-plain'
   let wlt = ''
@@ -143,8 +145,9 @@ function cellView(date: string): CellView {
   const devText = dev ? `少${dev.miss} · 多${dev.over}` : ''
   const title =
     `${dayjs(date).format('M/D')} ${wd(date)}｜${TAG_LABEL[status]}` +
-    (dev ? `｜少${dev.miss} · 多${dev.over}` : '')
-  return { status, label: TAG_LABEL[status], bgClass, wlt, devText, title }
+    (dev ? `｜少${dev.miss} · 多${dev.over}` : '') +
+    (warns.length ? `\n⚠ ${warns.join('\n⚠ ')}` : '')
+  return { status, label: TAG_LABEL[status], bgClass, wlt, devText, warns, title }
 }
 
 // ── 右側統計 ──
@@ -275,6 +278,11 @@ onUnmounted(() => {
                 >
                   <div class="ov-top">
                     <span class="ov-dnum">{{ dayjs(d).date() }}</span>
+                    <UIcon
+                      v-if="cellView(d).warns.length"
+                      name="i-lucide-triangle-alert"
+                      class="ov-warn"
+                    />
                     <span class="ov-tag" :class="'t-' + cellView(d).status">{{
                       cellView(d).label
                     }}</span>
@@ -507,6 +515,14 @@ button:not(:disabled) {
 .ov-dnum {
   font-size: 16px;
   font-weight: 700;
+}
+/* 資料缺漏提示：用 currentColor，才能疊在任何熱度底色與深色模式上都看得見 */
+.ov-warn {
+  flex: none;
+  margin-right: auto;
+  width: 14px;
+  height: 14px;
+  color: currentColor;
 }
 .ov-btm {
   display: flex;

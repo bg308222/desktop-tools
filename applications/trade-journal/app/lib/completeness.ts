@@ -16,3 +16,16 @@ export function deriveStatus(entry: Entry | null, images: ImagePresence): EntryS
   if (reviewed) return 'notrade_reviewed'
   return entry.noTrade ? 'notrade' : 'empty'
 }
+
+/**
+ * 資料完整性提示：只提醒缺漏，不影響狀態。
+ * 供月曆格子／記錄頁打驚嘆號用，回空陣列代表沒問題。
+ */
+export function warnings(entry: Entry | null, images: ImagePresence): string[] {
+  if (!entry) return []
+  const out: string[] = []
+  if (images.raw !== images.review) out.push('復盤圖只上傳了一張')
+  if (images.trade && entry.actual == null) out.push('缺實際 WLT')
+  if (images.raw && images.review && entry.ideal == null) out.push('缺理想 WLT，算不出偏差')
+  return out
+}

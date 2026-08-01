@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveStatus } from '../app/lib/completeness'
+import { deriveStatus, warnings } from '../app/lib/completeness'
 import type { Entry } from '../shared/domain'
 
 function entry(partial: Partial<Entry>): Entry {
@@ -96,5 +96,63 @@ describe('deriveStatus', () => {
   it('勾了空手但有交易圖 → 以圖片為準（recorded）', () => {
     const e = entry({ noTrade: true, actual: wlt })
     expect(deriveStatus(e, { trade: true, raw: false, review: false })).toBe('recorded')
+  })
+})
+
+/** 資料完整性提示，獨立於狀態：只提醒，不降級狀態。 */
+describe('warnings', () => {
+  it('無記錄 → 無提示', () => {
+    expect(warnings(null, none)).toEqual([])
+  })
+
+  it('什麼都沒填 → 無提示', () => {
+    expect(warnings(entry({}), none)).toEqual([])
+  })
+
+  it('資料齊全 → 無提示', () => {
+    const e = entry({ actual: wlt, ideal: wlt })
+    expect(warnings(e, { trade: true, raw: true, review: true })).toEqual([])
+  })
+
+  it('W1：復盤圖只有 raw', () => {
+    const e = entry({ actual: wlt })
+    expect(warnings(e, { trade: true, raw: true, review: false })).toEqual(['復盤圖只上傳了一張'])
+  })
+
+  it('W1：復盤圖只有 review', () => {
+    const e = entry({ actual: wlt })
+    expect(warnings(e, { trade: true, raw: false, review: true })).toEqual(['復盤圖只上傳了一張'])
+  })
+
+  it('W2：有交易圖但缺實際 WLT', () => {
+    expect(warnings(entry({}), { trade: true, raw: false, review: false })).toEqual([
+      '缺實際 WLT',
+    ])
+  })
+
+  it('W3：復盤組齊但缺理想 WLT', () => {
+    const e = entry({ actual: wlt })
+    expect(warnings(e, { trade: true, raw: true, review: true })).toEqual([
+      '缺理想 WLT，算不出偏差',
+    ])
+  })
+
+  it('W3：空手已復盤也適用', () => {
+    const e = entry({ noTrade: true })
+    expect(warnings(e, { trade: false, raw: true, review: true })).toEqual([
+      '缺理想 WLT，算不出偏差',
+    ])
+  })
+
+  it('可同時出現多則，依 W1/W2/W3 順序', () => {
+    expect(warnings(entry({}), { trade: true, raw: true, review: false })).toEqual([
+      '復盤圖只上傳了一張',
+      '缺實際 WLT',
+    ])
+  })
+
+  it('無交易圖時不提示缺實際 WLT', () => {
+    const e = entry({ noTrade: true })
+    expect(warnings(e, none)).toEqual([])
   })
 })
