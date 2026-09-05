@@ -3,14 +3,15 @@ name: new-app
 description: >
   在這個 web-apps 集合新增一個 app（Nuxt Vue 全端）。當使用者想「新增／建立一個工具、app、服務」、
   在 applications/ 底下開一個新專案、或說「幫我做一個 XXX 工具」時，一定要用這個 skill。
-  它會先用 brainstorming 把需求與設計談清楚，再照本集合既有慣例（以 trade-journal 為範本）把骨架建好，
+  它會先用內建的提問流程把需求與設計談清楚（不依賴外部 brainstorming skill），再照本集合既有慣例
+  （以 trade-journal 為範本）把骨架建好，同時建立該 app 自己的 doc/specs 規格與 doc/surveys 調研筆記，
   並避開幾個一定會踩到的坑（better-sqlite3 而非 bun:sqlite、TypeScript 5.x、tsx 跑腳本等）。
 ---
 
 # 新增一個 app
 
 這個 repo 是 **web-apps**：`applications/<app>/` 下每個都是獨立的 **Nuxt（Vue 3 前端 + Nitro 後端）** app，
-以 **better-sqlite3** 存資料、容器化部署。新增一個 app = **先談設計 → 再照慣例建骨架**。
+以 **better-sqlite3** 存資料、容器化部署。新增一個 app = **先談設計 → 再照慣例建骨架 → 規格與測試同步維護**。
 
 **唯一範本**：`applications/trade-journal/` 是完整的參考實作。凡是本文件沒逐字給出的檔案（元件、repository 寫法、
 API 路由結構等），一律**照 trade-journal 的模式抄**，改成新 app 的領域即可。
@@ -21,19 +22,50 @@ API 路由結構等），一律**照 trade-journal 的模式抄**，改成新 ap
 
 ## Step 1：先 brainstorm 設計（硬性前置，不可跳過）
 
-**在建立任何檔案、安裝任何套件之前**，先呼叫 `superpowers:brainstorming` 把需求談清楚並產出設計文件。
-理由：每個 app 的資料模型與頁面差很多，骨架長什麼樣完全取決於設計；沒有定案就scaffold只會白做。
+**在建立任何檔案、安裝任何套件之前**，先把需求談清楚並產出設計文件。
+理由：每個 app 的資料模型與頁面差很多，骨架長什麼樣完全取決於設計；沒有定案就 scaffold 只會白做。
 
-brainstorming 要收斂出的重點（決定骨架）：
+這一步不呼叫任何外部 skill，直接照下面的流程做。
 
-- **這個 app 做什麼**、給誰用、核心價值。
-- **資料模型**：需要哪些 SQLite 資料表、欄位、關聯（這決定 `server/db/`）。
+### 1.1 一次問一題，問到收斂
+
+規則：
+
+- **一次只問一個問題**，等使用者回答再問下一個。不要一口氣丟一張問卷。
+- 每題都要**先給你的預設建議**（「我傾向 A，因為…；你要 B 嗎？」），讓使用者只要說「好」就能前進。
+- 使用者說「你決定」時就自己決定，記下決策與理由，繼續下一題。
+- 只問**會改變骨架或資料模型**的問題；細節（按鈕文字、間距）留到實作時再問。
+
+必須收斂出的重點（決定骨架）：
+
+- **這個 app 做什麼**、給誰用、核心價值、**明確不做什麼**（範圍邊界）。
+- **資料模型**：需要哪些 SQLite 資料表、欄位、關聯、索引（這決定 `server/db/`）。
 - **是否需要圖片／檔案**：要的話沿用 trade-journal 的 `imageStore` + `DATA_DIR/images` + `/api/images/file` 模式。
-- **頁面與互動**：幾個 page、各自做什麼（這決定 `app/pages/`）。
+- **頁面與互動**：幾個 page、各自做什麼、主要操作流程（這決定 `app/pages/`）。
 - **外部整合／驗證**：預設個人使用、不做登入；有需要才加。
+- **驗收條件**：怎樣算做完（之後直接變成測試項目）。
 
-設計定案後，依 repo 慣例把 spec 寫到 `docs/superpowers/specs/YYYY-MM-DD-<app>-design.md` 並 commit，
-接著（brainstorming 的終點）進 `superpowers:writing-plans` 產實作計畫。**設計未經使用者同意前，不要開始 Step 2。**
+### 1.2 需要查資料時，順手寫調研筆記
+
+如果過程中要研究外部知識（第三方 API 規格、資料來源格式、演算法、某個領域的計算規則、
+某套件的用法與雷點…），**研究完一定要把結論寫成 `applications/<app>/doc/surveys/<主題>.md`**，
+別只留在對話裡。見下面「Step 4：文件與知識沉澱」。
+
+### 1.3 產出規格文件並取得同意
+
+設計定案後，把 spec 寫到 **`applications/<app>/doc/specs/<主題>.md`**（app 自己維護，不再寫到根目錄 `docs/`）。
+第一份通常是 `doc/specs/overview.md`（app 的整體規格），內容至少包含：
+
+- 目的與範圍（做什麼／不做什麼）
+- 資料模型（表、欄位、關聯）
+- 頁面與流程
+- API 一覽
+- 驗收條件
+
+規格文件寫完 **先給使用者確認**，同意後 commit（`docs(<app>): ...`），才進 Step 2。
+**設計未經使用者同意前，不要開始 Step 2。**
+
+> 實作計畫（步驟拆解）可以直接在對話裡列 todo，不必另外開檔；真的複雜再寫成 `doc/specs/` 旁的 plan 檔。
 
 ---
 
@@ -45,7 +77,7 @@ brainstorming 要收斂出的重點（決定骨架）：
 ### 2.1 目錄與 package.json
 
 ```bash
-mkdir -p applications/<app>
+mkdir -p applications/<app>/doc/specs applications/<app>/doc/surveys
 cd applications/<app>
 ```
 
@@ -175,10 +207,11 @@ CMD ["node", ".output/server/index.mjs"]
 ### 2.7 測試
 
 沿用 Vitest：repository 用 in-memory DB（`openDb(':memory:')`）測、純邏輯直接測。把測試放 `test/`，import 用相對路徑。
+測試要對得上 `doc/specs/` 裡寫的驗收條件——規格說得出來的行為，就要有測試蓋到。
 
 ---
 
-## 一定要避開的坑（附原因）
+## Step 3：一定要避開的坑（附原因）
 
 這些是本集合實作時踩過、且會反覆出現的問題：
 
@@ -203,7 +236,49 @@ CMD ["node", ".output/server/index.mjs"]
 
 ---
 
-## Step 3：驗證（做完才算完成）
+## Step 4：文件與知識沉澱（app 自己維護）
+
+每個 app **自己維護自己的文件**，放在 `applications/<app>/doc/`：
+
+```
+applications/<app>/doc/
+├── specs/      # 規格：這個 app 現在「應該」長什麼樣（描述現況，不是歷史）
+└── surveys/    # 調研：研究過的外部知識，讓下一個人不用重查
+```
+
+### 4.1 `doc/specs/*.md` — 規格文件
+
+- 按**主題**切檔（`overview.md`、`data-model.md`、`import-export.md`、`stats.md`…），不要按日期切。
+- 內容寫**現況**：目前的資料模型、頁面行為、API、驗收條件。舊決策被推翻就**改掉**，不要留一堆過期版本。
+- 決策有非顯而易見的理由時，在該段落下寫一行「為什麼這樣做」，避免以後被誤當成 bug 改掉。
+
+### 4.2 `doc/surveys/*.md` — 調研筆記
+
+只要**做過一段研究才得到的知識**，就寫成一篇 survey，例如：
+
+- 第三方 API／資料來源的欄位、限制、rate limit、認證方式、實測回應範例
+- 某個領域的計算規則、術語定義（例如交易的賺賠比、遊戲的市場價格機制）
+- 某套件的正確用法、版本雷點、替代方案比較與最後選擇的理由
+- 試過但**行不通**的方向與失敗原因（這最有價值，能省下重複踩坑）
+
+每篇至少包含：**問題／背景 → 查到的結論 → 依據（連結、實測輸出）→ 對本 app 的影響**。
+檔名用主題（`poe-trade-api.md`、`sqlite-fts.md`），開頭標一行調研日期，之後失效或更新時直接改內容。
+
+### 4.3 需求異動時（硬性規則）
+
+**每次改功能，規格與測試一定要同步更新**，順序如下：
+
+1. 先改 `doc/specs/` 對應段落（規格是真相來源）。
+2. 再改測試，讓測試對得上新規格。
+3. 才改實作，跑到測試綠。
+4. 若過程中又研究了新的外部知識，補到 `doc/surveys/`。
+
+Commit 時把「規格 + 測試 + 實作」放在**同一組功能的 commit** 裡（見 `CLAUDE.md`：commit 要細，一個 commit = 一組功能的完成）。
+**不要出現「改了行為但 spec 還寫舊行為」的狀態**——發現不一致就當成 bug 修掉。
+
+---
+
+## Step 5：驗證（做完才算完成）
 
 ```bash
 bun run test        # Vitest 全綠
@@ -212,5 +287,10 @@ just dev <app>      # 起 dev，開 localhost:3000 手動點過主要流程
 just mock <app>     # 若有寫 mock：確認產出資料、前端能看到
 bun run build       # 產物建得起來
 ```
+
+再檢查文件：
+
+- `doc/specs/` 描述的行為，跟實際跑起來的一致。
+- 這次研究過的外部知識，都已經寫進 `doc/surveys/`。
 
 全部通過後 commit。若這是集合的第二個以後的 app，順手在根 `README.md` 的工具表格補一列。
