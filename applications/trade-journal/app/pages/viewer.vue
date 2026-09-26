@@ -86,9 +86,7 @@ watch(
   async (e) => {
     slots.value = e ? toSlotPaths(await api.images.getByEntry(e.id)) : { ...EMPTY }
     tagNames.value = e ? (await api.tags.getEntryTags(e.id)).map((t) => t.name) : []
-    // 空手日常無交易圖：單圖模式預設落在有圖的 kind，避免空白
-    const present = KIND_ORDER.filter((k) => slots.value[k])
-    if (present.length && !slots.value[singleKind.value]) singleKind.value = present[0]!
+    // 換日期時維持目前圖種；沒圖由 ViewerStage 顯示「尚未上傳」
   },
   { immediate: true },
 )
