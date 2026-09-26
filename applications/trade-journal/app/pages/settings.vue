@@ -73,9 +73,11 @@ async function onImportPick(e: Event) {
   if (!confirm('匯入會覆蓋目前所有資料（系統會自動先備份一份），確定要匯入嗎？')) return
   importing.value = true
   try {
-    const fd = new FormData()
-    fd.append('file', file)
-    await $fetch('/api/app/import', { method: 'POST', body: fd })
+    await $fetch('/api/app/import', {
+      method: 'POST',
+      body: file,
+      headers: { 'content-type': 'application/gzip' },
+    })
     toast.add({ color: 'success', title: '匯入完成', description: '已自動備份舊資料，重新載入中…' })
     setTimeout(() => window.location.reload(), 800)
   } catch (err: unknown) {
