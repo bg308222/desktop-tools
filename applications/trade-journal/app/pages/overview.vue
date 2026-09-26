@@ -3,7 +3,6 @@ import dayjs from 'dayjs'
 import type { EntryStatus, EntryWithPresence, Market } from '../../shared/domain'
 import { deriveStatus, warnings } from '../lib/completeness'
 import { deviation, heatLevel } from '../lib/deviation'
-import { summarize } from '../lib/overviewStats'
 
 const api = useApi()
 const session = useSession()
@@ -27,17 +26,6 @@ const markets = ref<Market[]>([])
 const curMarket = ref<string | null>(null)
 const entries = ref<Map<string, EntryWithPresence>>(new Map())
 const menuOpen = ref(false)
-
-// 區間
-const rangeMode = ref<'7' | '30' | '90' | 'custom'>('30')
-const customFrom = ref(dayjs(today).add(-29, 'day').format('YYYY-MM-DD'))
-const customTo = ref(today)
-const rangeStart = computed(() =>
-  rangeMode.value === 'custom'
-    ? customFrom.value
-    : dayjs(today).add(-(Number(rangeMode.value) - 1), 'day').format('YYYY-MM-DD'),
-)
-const rangeEnd = computed(() => (rangeMode.value === 'custom' ? customTo.value : today))
 
 const marketName = (id: string | null) => markets.value.find((m) => m.id === id)?.name ?? '—'
 const marketOrder = computed(() => markets.value.map((m) => m.id))
@@ -150,15 +138,6 @@ function cellView(date: string): CellView {
   return { status, label: TAG_LABEL[status], bgClass, wlt, devText, warns, title }
 }
 
-// ── 右側統計 ──
-const summary = computed(() => {
-  const inRange = [...entries.value.values()].filter(
-    (e) => e.tradeDate >= rangeStart.value && e.tradeDate <= rangeEnd.value,
-  )
-  return summarize(inRange)
-})
-const pct = (v: number | null) => (v == null ? '—' : Math.round(v * 100) + '%')
-
 // ── 導向記錄頁 ──
 function openRecord(date: string) {
   if (!curMarket.value) return
@@ -254,9 +233,9 @@ onUnmounted(() => {
     </div>
 
     <!-- 主體 -->
-    <div class="flex-1 min-h-0 grid grid-cols-[1fr_384px] gap-4 p-4">
+    <div class="flex-1 min-h-0 flex p-4">
       <!-- 月曆面板：可捲區 + 固定圖例 -->
-      <div class="ov-cal-panel flex flex-col min-h-0 rounded-2xl border border-default bg-default overflow-hidden">
+      <div class="ov-cal-panel flex-1 flex flex-col min-h-0 rounded-2xl border border-default bg-default overflow-hidden">
         <div ref="calEl" class="ov-cal flex-1 min-h-0 overflow-y-auto px-3.5 pb-3">
           <div class="ov-weekhead">
             <div v-for="w in ['一', '二', '三', '四', '五']" :key="w">{{ w }}</div>
@@ -317,131 +296,6 @@ onUnmounted(() => {
           <span class="ml-auto"
             ><b class="ov-mk">少</b>=會做但沒有 · <b class="ov-ok">多</b>=不該做卻做</span
           >
-        </div>
-      </div>
-
-      <!-- 右側統計 -->
-      <div class="ov-side flex flex-col gap-3.5 overflow-y-auto">
-        <div class="rounded-2xl border border-default bg-default overflow-hidden">
-          <div class="px-3.5 py-3 border-b border-default">
-            <div class="text-[10px] uppercase tracking-wide text-dimmed">統計區間</div>
-            <div class="flex gap-1.5 mt-2 flex-wrap">
-              <button
-                v-for="r in (['7', '30', '90', 'custom'] as const)"
-                :key="r"
-                class="text-xs px-3 py-1.5 rounded-full border"
-                :class="
-                  rangeMode === r
-                    ? 'bg-primary text-inverted border-primary font-semibold'
-                    : 'border-default text-dimmed'
-                "
-                @click="rangeMode = r"
-              >
-                {{ { '7': '近一週', '30': '近一個月', '90': '近三個月', custom: '自訂…' }[r] }}
-              </button>
-            </div>
-            <div v-if="rangeMode === 'custom'" class="flex items-center gap-1.5 mt-2 text-xs">
-              <input v-model="customFrom" type="date" class="ov-dateinput" :max="customTo" />
-              <span class="text-dimmed">–</span>
-              <input
-                v-model="customTo"
-                type="date"
-                class="ov-dateinput"
-                :min="customFrom"
-                :max="today"
-              />
-            </div>
-            <div v-else class="mt-2 text-[11px] text-dimmed font-mono">
-              {{ rangeStart.replace(/-/g, '/') }} – {{ rangeEnd.replace(/-/g, '/') }}
-            </div>
-          </div>
-          <div class="grid grid-cols-2">
-            <div class="p-3.5 border-t border-r border-default">
-              <div class="text-[11px] uppercase text-dimmed">已復盤/有紀錄</div>
-              <div class="text-2xl font-bold mt-0.5">
-                {{ summary.stats.reviewedDays
-                }}<small class="text-xs text-dimmed font-medium"
-                  >/{{ summary.stats.recordedDays }}</small
-                >
-              </div>
-            </div>
-            <div class="p-3.5 border-t border-default">
-              <div class="text-[11px] uppercase text-dimmed">待復盤</div>
-              <div class="text-2xl font-bold mt-0.5 ov-ok">{{ summary.stats.todoDays }}</div>
-            </div>
-            <div class="p-3.5 border-t border-r border-default">
-              <div class="text-[11px] uppercase text-dimmed">少賺 / 多賠</div>
-              <div class="flex gap-3.5 items-baseline mt-0.5">
-                <span class="text-2xl font-bold ov-mk"
-                  >{{ summary.stats.missSum
-                  }}<small class="block text-[10px] text-dimmed font-medium">少賺W</small></span
-                >
-                <span class="text-lg font-bold ov-ok"
-                  >{{ summary.stats.overSum
-                  }}<small class="block text-[10px] text-dimmed font-medium">多賠L</small></span
-                >
-              </div>
-            </div>
-            <div class="p-3.5 border-t border-default">
-              <div class="text-[11px] uppercase text-dimmed">實際/理想勝率</div>
-              <div class="text-2xl font-bold mt-0.5">
-                {{ pct(summary.stats.actualWinRate)
-                }}<small class="text-xs text-dimmed font-medium"
-                  >/{{ pct(summary.stats.idealWinRate) }}</small
-                >
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 待復盤清單 -->
-        <div class="rounded-2xl border border-default bg-default overflow-hidden">
-          <h4 class="flex justify-between items-center px-3.5 py-3 text-sm bg-elevated border-b border-default font-semibold">
-            待復盤 <span class="text-dimmed font-normal">{{ summary.todo.length }}</span>
-          </h4>
-          <div class="ov-list max-h-[240px] overflow-y-auto">
-            <button
-              v-for="t in summary.todo"
-              :key="t.date"
-              class="ov-li flex items-center justify-between w-full px-3.5 py-3 text-sm border-b border-default"
-              @click="openRecord(t.date)"
-            >
-              <span class="font-semibold font-mono"
-                >{{ dayjs(t.date).format('M/D') }} {{ wd(t.date) }}</span
-              >
-              <span class="ov-tag" :class="t.notrade ? 't-notrade' : 't-recorded'">{{
-                t.notrade ? '空手待復盤' : '待復盤'
-              }}</span>
-            </button>
-            <div v-if="!summary.todo.length" class="text-center text-dimmed text-xs py-4">
-              此區間沒有待復盤 🎉
-            </div>
-          </div>
-        </div>
-
-        <!-- 高偏差待複習 -->
-        <div class="rounded-2xl border border-default bg-default overflow-hidden">
-          <h4 class="flex justify-between items-center px-3.5 py-3 text-sm bg-elevated border-b border-default font-semibold">
-            高偏差待複習 <span class="text-dimmed font-normal text-[10px]">少賺 &gt; 多賠</span>
-          </h4>
-          <div class="ov-list max-h-[280px] overflow-y-auto">
-            <button
-              v-for="h in summary.heat.slice(0, 20)"
-              :key="h.date"
-              class="ov-li flex items-center justify-between w-full px-3.5 py-3 text-sm border-b border-default"
-              @click="openRecord(h.date)"
-            >
-              <span class="font-semibold font-mono"
-                >{{ dayjs(h.date).format('M/D') }} {{ wd(h.date) }}</span
-              >
-              <span class="font-mono text-[11px]"
-                ><b class="ov-mk">少{{ h.miss }}</b> · <b class="ov-ok">多{{ h.over }}</b></span
-              >
-            </button>
-            <div v-if="!summary.heat.length" class="text-center text-dimmed text-xs py-4">
-              此區間沒有偏差資料
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -587,45 +441,19 @@ button:not(:disabled) {
 .ov-sc.h-0 { border-radius: 3px 0 0 3px; }
 .ov-sc.h-5 { border-radius: 0 3px 3px 0; }
 
-.ov-li {
-  background: transparent;
-}
-.ov-li:hover {
-  background: var(--ui-bg-elevated);
-}
-.ov-li:last-child {
-  border-bottom: none;
-}
-.ov-dateinput {
-  border: 1px solid var(--ui-border);
-  background: var(--ui-bg);
-  border-radius: 6px;
-  padding: 2px 6px;
-  color: var(--ui-text);
-  font-family: ui-monospace, monospace;
-}
-
 /* scrollbar：細、半透明、跟主題 */
-.ov-cal,
-.ov-side,
-.ov-list {
+.ov-cal {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--ui-text-dimmed) 55%, transparent) transparent;
 }
-.ov-cal::-webkit-scrollbar,
-.ov-side::-webkit-scrollbar,
-.ov-list::-webkit-scrollbar {
+.ov-cal::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-.ov-cal::-webkit-scrollbar-track,
-.ov-side::-webkit-scrollbar-track,
-.ov-list::-webkit-scrollbar-track {
+.ov-cal::-webkit-scrollbar-track {
   background: transparent;
 }
-.ov-cal::-webkit-scrollbar-thumb,
-.ov-side::-webkit-scrollbar-thumb,
-.ov-list::-webkit-scrollbar-thumb {
+.ov-cal::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--ui-text-dimmed) 55%, transparent);
   border-radius: 99px;
   border: 2px solid transparent;
