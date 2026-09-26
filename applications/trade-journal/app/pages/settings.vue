@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Market } from '../../shared/domain'
+import type { DataStatus, ImageKind, Market } from '../../shared/domain'
 
 const api = useApi()
 const toast = useToast()
@@ -9,6 +9,9 @@ const name = ref('')
 const folder = ref('')
 const importFile = ref<HTMLInputElement | null>(null)
 const importing = ref(false)
+const status = ref<DataStatus | null>(null)
+const statusLoading = ref(false)
+const KIND_LABEL: Record<ImageKind, string> = { trade: '交易圖', raw: '原圖', review: '復盤圖' }
 
 async function reload() {
   markets.value = await api.markets.list()
@@ -16,7 +19,22 @@ async function reload() {
 onMounted(async () => {
   await reload()
   folder.value = await api.app.dataFolder()
+  await loadStatus()
 })
+
+async function loadStatus() {
+  statusLoading.value = true
+  try {
+    status.value = await api.app.status()
+  } finally {
+    statusLoading.value = false
+  }
+}
+async function copyHash() {
+  if (!status.value) return
+  await navigator.clipboard.writeText(status.value.hash)
+  toast.add({ color: 'success', title: '已複製完整 hash' })
+}
 
 async function add() {
   const n = name.value.trim()
@@ -74,6 +92,60 @@ async function onImportPick(e: Event) {
 <template>
   <div class="flex flex-col gap-4 p-6 max-w-[760px]">
     <h1 class="text-2xl font-bold">設定</h1>
+
+    <div class="border border-default rounded-lg p-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="font-semibold">資料狀態</p>
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          icon="i-lucide-refresh-cw"
+          :loading="statusLoading"
+          aria-label="重新計算"
+          @click="loadStatus"
+        />
+      </div>
+      <div v-if="status" class="grid grid-cols-3 gap-3">
+        <div class="rounded-md bg-elevated/60 px-3 py-2">
+          <div class="text-xs text-dimmed">記錄</div>
+          <div class="text-xl font-bold font-mono">{{ status.entryCount }}</div>
+          <div class="text-xs text-dimmed mt-0.5">
+            <span v-for="(m, i) in status.byMarket" :key="m.marketId"
+              >{{ i ? ' · ' : '' }}{{ m.name }} {{ m.count }}</span
+            >
+          </div>
+        </div>
+        <div class="rounded-md bg-elevated/60 px-3 py-2">
+          <div class="text-xs text-dimmed">圖片（存在 / 總數）</div>
+          <div
+            class="text-xl font-bold font-mono"
+            :class="status.imagePresent < status.imageCount ? 'text-error' : ''"
+          >
+            {{ status.imagePresent }}<span class="text-sm text-dimmed"> / {{ status.imageCount }}</span>
+          </div>
+        </div>
+        <div class="rounded-md bg-elevated/60 px-3 py-2">
+          <div class="text-xs text-dimmed">資料指紋（SHA-256）</div>
+          <button
+            class="text-xl font-bold font-mono cursor-pointer hover:text-primary"
+            :title="status.hash + '\n點擊複製完整 hash'"
+            @click="copyHash"
+          >
+            {{ status.hash.slice(0, 12) }}
+          </button>
+          <div class="text-xs text-dimmed mt-0.5">市場、日期、WLT、空手、圖種與檔名</div>
+        </div>
+      </div>
+      <div v-if="status?.missing.length" class="mt-3 text-sm">
+        <p class="text-error font-semibold mb-1">缺少的圖檔</p>
+        <ul class="text-dimmed font-mono text-xs flex flex-col gap-0.5 max-h-40 overflow-y-auto">
+          <li v-for="(m, i) in status.missing" :key="i">
+            {{ m.tradeDate }} {{ m.marketName }} {{ KIND_LABEL[m.kind] }}
+          </li>
+        </ul>
+      </div>
+    </div>
 
     <div class="border border-default rounded-lg p-4">
       <p class="font-semibold mb-3">市場清單</p>

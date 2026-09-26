@@ -61,3 +61,14 @@ export interface ImagePresence {
 export interface EntryWithPresence extends Entry {
   images: ImagePresence
 }
+
+/** 設定頁「資料狀態」：記錄數、資料指紋、圖片檔完整度 */
+export interface DataStatus {
+  entryCount: number
+  byMarket: { marketId: string; name: string; count: number }[]
+  /** SHA-256（hex）：市場、日期、三組 WLT、空手、圖種與檔名 */
+  hash: string
+  imageCount: number
+  imagePresent: number
+  missing: { marketName: string; tradeDate: string; kind: ImageKind }[]
+}

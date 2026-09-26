@@ -1,4 +1,5 @@
 import type {
+  DataStatus,
   Market,
   Entry,
   EntryWithPresence,
@@ -111,6 +112,7 @@ export function useApi() {
     app: {
       dataFolder: () =>
         call(() => $fetch<{ path: string }>('/api/app/data-folder').then((r) => r.path)),
+      status: () => call(() => $fetch<DataStatus>('/api/app/status')),
     },
   }
 }
