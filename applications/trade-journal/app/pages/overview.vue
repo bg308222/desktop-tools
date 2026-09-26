@@ -147,13 +147,21 @@ function openRecord(date: string) {
 }
 
 // ── 捲到今天 ──
+// 月曆只畫週一～五，週末時以前一個工作日（週五）為定位目標
+const anchorDay = (() => {
+  let d = dayjs(today)
+  while (d.day() === 0 || d.day() === 6) d = d.add(-1, 'day')
+  return d.format('YYYY-MM-DD')
+})()
 const calEl = ref<HTMLElement | null>(null)
 function scrollToToday(smooth: boolean) {
   const cal = calEl.value
   if (!cal) return
-  const cell = cal.querySelector('.ov-cell.today') as HTMLElement | null
+  const cell = cal.querySelector(`[data-date="${anchorDay}"]`) as HTMLElement | null
   if (!cell) return
-  const top = cell.offsetTop - cal.clientHeight * 0.5
+  // 以相對捲動容器的實際位置計算（calEl 非定位元素，offsetTop 不可靠）
+  const offset = cell.getBoundingClientRect().top - cal.getBoundingClientRect().top + cal.scrollTop
+  const top = offset - cal.clientHeight * 0.5 + cell.offsetHeight / 2
   cal.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' })
 }
 
@@ -251,6 +259,7 @@ onUnmounted(() => {
                 <button
                   v-else
                   class="ov-cell"
+                  :data-date="d"
                   :class="[cellView(d).bgClass, { today: d === today }]"
                   :title="cellView(d).title"
                   @click="openRecord(d)"
