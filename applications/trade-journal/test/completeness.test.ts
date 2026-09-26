@@ -93,9 +93,16 @@ describe('deriveStatus', () => {
     })
   })
 
-  it('勾了空手但有交易圖 → 以圖片為準（recorded）', () => {
-    const e = entry({ noTrade: true, actual: wlt })
-    expect(deriveStatus(e, { trade: true, raw: false, review: false })).toBe('recorded')
+  describe('勾了空手時交易圖不影響狀態', () => {
+    it('空手 + 交易圖 → notrade', () => {
+      const e = entry({ noTrade: true, actual: wlt })
+      expect(deriveStatus(e, { trade: true, raw: false, review: false })).toBe('notrade')
+    })
+
+    it('空手 + 交易圖 + 復盤組 → notrade_reviewed', () => {
+      const e = entry({ noTrade: true })
+      expect(deriveStatus(e, { trade: true, raw: true, review: true })).toBe('notrade_reviewed')
+    })
   })
 })
 
@@ -149,6 +156,11 @@ describe('warnings', () => {
       '復盤圖只上傳了一張',
       '缺實際 WLT',
     ])
+  })
+
+  it('空手日有交易圖也不提示缺實際 WLT', () => {
+    const e = entry({ noTrade: true })
+    expect(warnings(e, { trade: true, raw: false, review: false })).toEqual([])
   })
 
   it('無交易圖時不提示缺實際 WLT', () => {

@@ -284,13 +284,10 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
             label="空手（今日無交易）"
             @update:model-value="toggleNoTrade"
           />
-          <span class="text-xs text-dimmed">開啟後隱藏交易圖與實際 WLT，仍可復盤（原圖／復盤圖／理想 WLT）</span>
+          <span class="text-xs text-dimmed">開啟後交易圖可傳可不傳，不影響狀態</span>
         </div>
 
-        <section
-          v-if="!(entry?.noTrade)"
-          class="rounded-lg border border-default overflow-hidden"
-        >
+        <section class="rounded-lg border border-default overflow-hidden">
           <div class="px-4 py-3 border-b border-default bg-elevated/40 font-semibold">交易</div>
           <div class="p-4 flex flex-col gap-4">
             <div class="max-w-[380px]">
