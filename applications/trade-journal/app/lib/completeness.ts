@@ -7,7 +7,7 @@ import type { Entry, EntryStatus, ImagePresence } from '../../shared/domain'
  *
  * 空手旗標優先：勾了空手就忽略交易圖（可上傳留存，但不影響狀態）；
  * 未勾空手時，兩者皆無用來分辨「還沒開始記」。
- * actual/ideal/would 不參與判定——缺漏由 warning 呈現，不降級狀態。
+ * actual/ideal 不參與判定——缺漏由 warning 呈現，不降級狀態。
  */
 export function deriveStatus(entry: Entry | null, images: ImagePresence): EntryStatus {
   if (!entry) return 'empty'

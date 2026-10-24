@@ -34,9 +34,6 @@ export function openDb(source?: string): Db {
   const addEntryCol = (name: string, ddl: string) => {
     if (!entryCols.has(name)) db.exec(`ALTER TABLE entry ADD COLUMN ${ddl}`)
   }
-  addEntryCol('would_w', 'would_w INTEGER')
-  addEntryCol('would_l', 'would_l INTEGER')
-  addEntryCol('would_t', 'would_t INTEGER')
   addEntryCol('no_trade', 'no_trade INTEGER NOT NULL DEFAULT 0')
 
   // tag 長出內文欄位

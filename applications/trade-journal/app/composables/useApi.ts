@@ -15,7 +15,6 @@ export interface EntryUpsertInput {
   tradeDate: string
   actual?: Wlt | null
   ideal?: Wlt | null
-  would?: Wlt | null
   noTrade?: boolean
   noteJson?: string | null
 }
@@ -58,7 +57,7 @@ export function useApi() {
         call(() => $fetch<Entry | null>('/api/entries', { query: { market: marketId, date } })),
       upsert: (input: EntryUpsertInput) =>
         call(() => $fetch<Entry>('/api/entries', { method: 'PUT', body: input })),
-      setWlt: (id: string, kind: 'actual' | 'ideal' | 'would', value: Wlt | null) =>
+      setWlt: (id: string, kind: 'actual' | 'ideal', value: Wlt | null) =>
         call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { wlt: { kind, value } } })),
       setNoTrade: (id: string, noTrade: boolean) =>
         call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { noTrade } })),

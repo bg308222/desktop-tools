@@ -211,7 +211,6 @@ const empty = computed(() => !curMarket.value || !curDate.value)
 const WLT_KINDS = [
   { key: 'actual', label: '實際' },
   { key: 'ideal', label: '理想' },
-  { key: 'would', label: '會做' },
 ] as const
 /** 未填的組顯示破折號，不要湊 0 混淆「真的是 0」與「還沒填」。 */
 const fmtWlt = (v: Wlt | null) => (v ? `${v.w}W ${v.l}L ${v.t}T` : '—')

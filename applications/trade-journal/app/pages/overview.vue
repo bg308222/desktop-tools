@@ -303,7 +303,7 @@ onUnmounted(() => {
             <span>0→5+</span>
           </span>
           <span class="ml-auto"
-            ><b class="ov-mk">少</b>=會做但沒有 · <b class="ov-ok">多</b>=不該做卻做</span
+            ><b class="ov-mk">少</b>=該做沒做 · <b class="ov-ok">多</b>=不該做卻做</span
           >
         </div>
       </div>

@@ -208,15 +208,13 @@ function run() {
         entries.setNoTrade(e.id, true)
         noTradeCount++
         if (chance(0.5)) {
-          // 臨時有事：其實有機會 → 保留原圖/復盤圖/理想 WLT，且會做 = 理想
+          // 臨時有事：其實有機會 → 保留原圖/復盤圖/理想 WLT
           putImage(e.id, 'raw', caption)
           putImage(e.id, 'review', caption)
           imageCount += 2
-          const ideal = randomWlt(2)
-          entries.setWlt(e.id, 'ideal', ideal)
-          entries.setWlt(e.id, 'would', ideal)
+          entries.setWlt(e.id, 'ideal', randomWlt(2))
         }
-        // 另一半「沒機會」：不放圖、理想/會做皆 0（不填）
+        // 另一半「沒機會」：不放圖、理想 WLT 不填
         continue
       }
 
@@ -231,8 +229,6 @@ function run() {
         putImage(e.id, 'review', caption)
         imageCount += 2
         entries.setWlt(e.id, 'ideal', randomWlt(3))
-        // 一般日偶爾有一筆「會做但沒做成」
-        if (chance(0.25)) entries.setWlt(e.id, 'would', { w: 1, l: 0, t: 0 })
       }
 
       // 標籤 1~3 個

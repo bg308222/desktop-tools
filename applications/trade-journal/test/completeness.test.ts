@@ -9,7 +9,6 @@ function entry(partial: Partial<Entry>): Entry {
     tradeDate: '2026-07-14',
     actual: null,
     ideal: null,
-    would: null,
     noTrade: false,
     noteJson: null,
     createdAt: '',
@@ -24,7 +23,7 @@ const wlt = { w: 1, l: 0, t: 0 }
 /**
  * 狀態只看兩件事：交易圖是否存在、復盤組（raw+review 皆有）是否齊。
  * 空手旗標只在兩者皆無時用來分辨「主動空手」與「還沒記」。
- * actual/ideal/would 一律不參與判定（缺漏由 warning 呈現）。
+ * actual/ideal 一律不參與判定（缺漏由 warning 呈現）。
  */
 describe('deriveStatus', () => {
   it('無記錄 → empty', () => {

@@ -12,7 +12,6 @@ const DEFAULT_RR = 2
 const KINDS = [
   { key: 'actual', label: '實際' },
   { key: 'ideal', label: '理想' },
-  { key: 'would', label: '會做' },
 ] as const
 
 const loaded = ref(false)

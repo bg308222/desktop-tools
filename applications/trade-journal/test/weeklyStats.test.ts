@@ -9,7 +9,6 @@ function entry(tradeDate: string, marketId: string, partial: Partial<Entry> = {}
     tradeDate,
     actual: null,
     ideal: null,
-    would: null,
     noTrade: false,
     noteJson: null,
     createdAt: '',
@@ -55,15 +54,14 @@ describe('weeklyStats', () => {
     expect(r.map((x) => x.start)).toEqual(['2026-07-27', '2026-07-20'])
   })
 
-  it('三組 WLT 各自獨立加總，null 跳過', () => {
+  it('實際／理想 WLT 各自獨立加總，null 跳過', () => {
     const es = [
       entry('2026-07-27', 'm1', { actual: w(1, 2, 3), ideal: w(4, 0, 0) }),
-      entry('2026-07-28', 'm1', { actual: w(10, 20, 30), would: w(0, 0, 7) }),
+      entry('2026-07-28', 'm1', { actual: w(10, 20, 30) }),
     ]
     const r = weeklyStats(es, MARKETS, '2026-07-29')
     expect(r[0]!.actual).toEqual(w(11, 22, 33))
     expect(r[0]!.ideal).toEqual(w(4, 0, 0))
-    expect(r[0]!.would).toEqual(w(0, 0, 7))
   })
 
   it('完全沒有 WLT 的 entry 不算資料，該週不出現', () => {
@@ -86,7 +84,6 @@ describe('weeklyStats', () => {
     const es = [entry('2026-07-27', 'm1', { actual: w(1, 0, 0) })]
     const r = weeklyStats(es, MARKETS, '2026-07-29')
     expect(r[0]!.markets[0]!.ideal).toEqual(ZERO)
-    expect(r[0]!.markets[0]!.would).toEqual(ZERO)
   })
 
   it('isCurrent 只有含今天的那週為 true', () => {

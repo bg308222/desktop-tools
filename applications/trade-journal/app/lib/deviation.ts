@@ -2,7 +2,7 @@ import type { Entry } from '../../shared/domain'
 
 /** 一天的偏差：只看兩個數（無 T）。 */
 export interface Deviation {
-  /** 少賺（W）＝會做但沒有＝max(0, 理想W − 實際W − 會做W) */
+  /** 少賺（W）＝該做沒做＝max(0, 理想W − 實際W) */
   miss: number
   /** 多賠（L）＝不該做卻做＝max(0, 實際L − 理想L) */
   over: number
@@ -16,18 +16,15 @@ const ZERO = { w: 0, l: 0, t: 0 }
  * actual 為 null 通常代表「還沒填」→ 回 null；但空手日例外：
  * 它的 actual 語意上就是 0W 0L（沒下單），只是不會被寫進 DB，
  * 因此在這裡補回 0，否則空手日的少賺永遠算不出來、熱度底色永遠是空的。
- *
- * would（會做）為 null 視為 0——它補足「人不在場但確定會做」的贏單，屬可原諒，從少賺扣掉。
  */
 export function deviation(
-  entry: Pick<Entry, 'actual' | 'ideal' | 'would' | 'noTrade'>,
+  entry: Pick<Entry, 'actual' | 'ideal' | 'noTrade'>,
 ): Deviation | null {
   const { ideal } = entry
   const actual = entry.actual ?? (entry.noTrade ? ZERO : null)
   if (!actual || !ideal) return null
-  const would = entry.would ?? ZERO
   return {
-    miss: Math.max(0, ideal.w - actual.w - would.w),
+    miss: Math.max(0, ideal.w - actual.w),
     over: Math.max(0, actual.l - ideal.l),
   }
 }
