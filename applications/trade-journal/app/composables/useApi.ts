@@ -9,6 +9,7 @@ import type {
   TagImage,
   Wlt,
 } from '../../shared/domain'
+import type { QueryCondition, QueryResultRow, SavedQuery } from '../../shared/query'
 
 export interface EntryUpsertInput {
   marketId: string
@@ -69,8 +70,6 @@ export function useApi() {
         call(() => $fetch<Entry[]>('/api/entries', { query: { market: marketId, from, to } })),
       listByDate: (date: string) =>
         call(() => $fetch<Entry[]>('/api/entries', { query: { date } })),
-      listByTagIds: (tagIds: string[]) =>
-        call(() => $fetch<Entry[]>('/api/entries', { query: { tags: tagIds.join(',') } })),
       dates: () => call(() => $fetch<string[]>('/api/entries/dates')),
     },
     images: {
@@ -101,6 +100,16 @@ export function useApi() {
         call(() => $fetch<Tag[]>('/api/tags/entry', { query: { entry: entryId } })),
       setEntryTags: (entryId: string, tagIds: string[]) =>
         call(() => $fetch('/api/tags/entry', { method: 'POST', body: { entryId, tagIds } })),
+    },
+    queries: {
+      list: () => call(() => $fetch<SavedQuery[]>('/api/queries')),
+      create: (name: string, conditions: QueryCondition[]) =>
+        call(() => $fetch<SavedQuery>('/api/queries', { method: 'POST', body: { name, conditions } })),
+      update: (id: string, patch: { name?: string; conditions?: QueryCondition[] }) =>
+        call(() => $fetch<SavedQuery>(`/api/queries/${id}`, { method: 'PATCH', body: patch })),
+      remove: (id: string) => call(() => $fetch(`/api/queries/${id}`, { method: 'DELETE' })),
+      run: (conditions: QueryCondition[]) =>
+        call(() => $fetch<QueryResultRow[]>('/api/queries/run', { method: 'POST', body: { conditions } })),
     },
     overview: {
       list: (marketId: string, from: string, to: string) =>
