@@ -117,12 +117,8 @@ export function createEntryRepo(db: Db) {
   const listByDate = (date: string): Entry[] =>
     db.prepare(`SELECT * FROM entry WHERE trade_date = :d`).all<EntryRow>({ d: date }).map(toEntry)
 
-  /** 某市場、某日期範圍的 entry，附帶三種圖是否存在（供總覽算狀態）。 */
-  const listPresenceByMarketInRange = (
-    marketId: string,
-    from: string,
-    to: string,
-  ): EntryWithPresence[] =>
+  /** entry 附帶三種圖是否存在；where 為可選的過濾子句（欄位以 e. 前綴）。 */
+  const listPresence = (where: string, params: Record<string, string>): EntryWithPresence[] =>
     db
       .prepare(
         `SELECT e.*,
@@ -131,34 +127,30 @@ export function createEntryRepo(db: Db) {
            MAX(CASE WHEN i.kind = 'review' THEN 1 ELSE 0 END) AS has_review
          FROM entry e
          LEFT JOIN image i ON i.entry_id = e.id
-         WHERE e.market_id = :m AND e.trade_date >= :from AND e.trade_date <= :to
+         ${where ? `WHERE ${where}` : ''}
          GROUP BY e.id
          ORDER BY e.trade_date`,
       )
-      .all<EntryRow & { has_trade: number; has_raw: number; has_review: number }>({
-        m: marketId,
-        from,
-        to,
-      })
+      .all<EntryRow & { has_trade: number; has_raw: number; has_review: number }>(params)
       .map((r) => ({
         ...toEntry(r),
         images: { trade: !!r.has_trade, raw: !!r.has_raw, review: !!r.has_review },
       }))
 
-  const listByTagIds = (tagIds: string[]): Entry[] => {
-    if (tagIds.length === 0) return []
-    const placeholders = tagIds.map((_, i) => `:t${i}`).join(', ')
-    const params: Record<string, string> = {}
-    tagIds.forEach((id, i) => {
-      params[`t${i}`] = id
+  /** 某市場、某日期範圍的 entry，附帶三種圖是否存在（供總覽算狀態）。 */
+  const listPresenceByMarketInRange = (
+    marketId: string,
+    from: string,
+    to: string,
+  ): EntryWithPresence[] =>
+    listPresence(`e.market_id = :m AND e.trade_date >= :from AND e.trade_date <= :to`, {
+      m: marketId,
+      from,
+      to,
     })
-    return db
-      .prepare(
-        `SELECT DISTINCT e.* FROM entry e JOIN entry_tag et ON et.entry_id = e.id WHERE et.tag_id IN (${placeholders}) ORDER BY e.trade_date`,
-      )
-      .all<EntryRow>(params)
-      .map(toEntry)
-  }
+
+  /** 全部 entry 附帶圖片存在旗標（供查詢比對狀態）。 */
+  const listAllPresence = (): EntryWithPresence[] => listPresence('', {})
 
   const remove = (id: string): void => {
     db.prepare(`DELETE FROM entry WHERE id = :id`).run({ id })
@@ -182,8 +174,8 @@ export function createEntryRepo(db: Db) {
     listInRange,
     listByMarketInRange,
     listPresenceByMarketInRange,
+    listAllPresence,
     listByDate,
-    listByTagIds,
     distinctDates,
     remove,
   }

@@ -6,7 +6,7 @@ import Database from 'better-sqlite3'
 import { openDb } from '../server/db/connection'
 import { createEntryRepo } from '../server/db/repositories/entryRepo'
 
-const TABLES = ['market', 'entry', 'image', 'tag', 'entry_tag', 'tag_image']
+const TABLES = ['market', 'entry', 'image', 'tag', 'entry_tag', 'tag_image', 'saved_query']
 
 describe('openDb', () => {
   it('建立全部資料表', async () => {

@@ -55,4 +55,11 @@ CREATE TABLE IF NOT EXISTS tag_image (
   file_path   TEXT NOT NULL,
   sort_order  INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS saved_query (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  conditions_json TEXT NOT NULL DEFAULT '[]',
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `

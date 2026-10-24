@@ -83,6 +83,18 @@ export function createTagRepo(db: Db) {
         }
       })
     },
+    /** 全部 entry → 標籤 id 集合（供查詢比對）。 */
+    entryTagMap(): Map<string, Set<string>> {
+      const map = new Map<string, Set<string>>()
+      for (const r of db
+        .prepare(`SELECT entry_id, tag_id FROM entry_tag`)
+        .all<{ entry_id: string; tag_id: string }>()) {
+        const set = map.get(r.entry_id) ?? new Set<string>()
+        set.add(r.tag_id)
+        map.set(r.entry_id, set)
+      }
+      return map
+    },
     getEntryTags(entryId: string): Tag[] {
       return db
         .prepare(
