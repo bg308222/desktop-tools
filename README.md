@@ -39,3 +39,7 @@ just dev other-app         # 明確傳入時仍以參數為準
 
 - 資料存 `DATA_DIR`（開發預設各 app 的 `./data`，已 gitignore；Docker 掛 `/data`）。
 - 每個 app 用 `just build <app>` 產出 `image <app>:<version>`，以容器部署。
+
+## 文件
+
+- 各 app 規格：`applications/<app>/spec.md`

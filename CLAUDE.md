@@ -2,3 +2,4 @@
 - 所有套件都用 exact version（`package.json` 不用 `^`／`~`，寫死版本號）
 - 這是 web app 集合：每個 app 在 `applications/<app>/`，是獨立的 Nuxt（Vue 全端）專案
 - git commit 要細：每個 commit 是一組功能的完成，不要一次把一大堆不相關的變動塞進同一個 commit
+- 每個 app 都要有 `applications/<app>/spec.md`，說明該 app 的規格（功能、資料模型、API、驗收條件等），描述現況而非歷史；改行為時要同步更新
