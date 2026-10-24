@@ -3,7 +3,6 @@ import { openDb } from '../server/db/connection'
 import { createQueryRepo } from '../server/db/repositories/queryRepo'
 import { createMarketRepo } from '../server/db/repositories/marketRepo'
 import { createEntryRepo } from '../server/db/repositories/entryRepo'
-import { createImageRepo } from '../server/db/repositories/imageRepo'
 import { createTagRepo } from '../server/db/repositories/tagRepo'
 import { runQuery } from '../server/utils/runQuery'
 
@@ -35,7 +34,6 @@ describe('runQuery', () => {
     const db = openDb(':memory:')
     const markets = createMarketRepo(db)
     const entries = createEntryRepo(db)
-    const images = createImageRepo(db)
     const tags = createTagRepo(db)
     const nq = markets.create('NQ')
     const cl = markets.create('CL')
@@ -46,41 +44,46 @@ describe('runQuery', () => {
     const e3 = entries.upsert({ marketId: nq.id, tradeDate: '2026-10-08' })
     tags.setEntryTags(e1.id, [t1.id, t2.id])
     tags.setEntryTags(e2.id, [t1.id])
-    images.upsert(e1.id, 'raw', 'r.png', null, null)
-    images.upsert(e1.id, 'review', 'v.png', null, null)
     const run = (conds: Parameters<typeof runQuery>[1]) =>
       runQuery(
         {
-          entries: entries.listAllPresence(),
+          entries: entries.listAll(),
           entryTags: tags.entryTagMap(),
           tagIds: new Set(tags.list().map((t) => t.id)),
           marketOrder: markets.list().map((m) => m.id),
         },
         conds,
-      ).map((e) => e.id)
+      )
     return { run, tags, t1, t2, nq, e1, e2, e3 }
   }
 
-  it('依日期、同日依市場順序排序；無條件回全部', () => {
-    const { run, e1, e2, e3 } = setup()
-    expect(run([])).toEqual([e3.id, e2.id, e1.id])
+  const ids = (rows: { id: string }[]) => rows.map((r) => r.id)
+
+  it('依日期、同日依市場順序排序；無條件回全部，每列帶標籤', () => {
+    const { run, t1, e1, e2, e3 } = setup()
+    const rows = run([])
+    expect(ids(rows)).toEqual([e3.id, e2.id, e1.id])
+    expect(rows[1]!.tagIds).toEqual([t1.id])
+    expect(rows[0]!.tagIds).toEqual([])
   })
 
-  it('標籤 + 市場 + 狀態組合', () => {
+  it('標籤 + 市場 + 日期組合', () => {
     const { run, t1, t2, nq, e1, e2 } = setup()
-    expect(run([{ kind: 'tag', mode: 'all', tagIds: [t1.id, t2.id] }])).toEqual([e1.id])
+    expect(ids(run([{ kind: 'tag', mode: 'all', tagIds: [t1.id, t2.id] }]))).toEqual([e1.id])
     expect(
-      run([
-        { kind: 'tag', mode: 'any', tagIds: [t1.id] },
-        { kind: 'market', marketIds: [nq.id] },
-      ]),
+      ids(
+        run([
+          { kind: 'tag', mode: 'any', tagIds: [t1.id] },
+          { kind: 'market', marketIds: [nq.id] },
+        ]),
+      ),
     ).toEqual([e2.id])
-    expect(run([{ kind: 'status', statuses: ['notrade_reviewed'] }])).toEqual([e1.id])
+    expect(ids(run([{ kind: 'date', from: '2026-10-09', to: null }]))).toEqual([e2.id, e1.id])
   })
 
   it('已刪除的標籤會被忽略', () => {
     const { run, tags, t1, t2, e1, e2 } = setup()
     tags.remove(t2.id)
-    expect(run([{ kind: 'tag', mode: 'all', tagIds: [t1.id, t2.id] }])).toEqual([e2.id, e1.id])
+    expect(ids(run([{ kind: 'tag', mode: 'all', tagIds: [t1.id, t2.id] }]))).toEqual([e2.id, e1.id])
   })
 })

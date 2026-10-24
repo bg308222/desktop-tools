@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const { entries, tags, markets } = useRepos()
   return runQuery(
     {
-      entries: entries.listAllPresence(),
+      entries: entries.listAll(),
       entryTags: tags.entryTagMap(),
       tagIds: new Set(tags.list().map((t) => t.id)),
       marketOrder: markets.list().map((m) => m.id),

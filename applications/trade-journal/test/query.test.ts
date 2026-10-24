@@ -4,7 +4,6 @@ import { matchConditions, sanitizeConditions, type QueryCandidate } from '../sha
 const cand = (partial: Partial<QueryCandidate> = {}): QueryCandidate => ({
   marketId: 'm1',
   tradeDate: '2026-10-15',
-  status: 'reviewed',
   tagIds: new Set(['a', 'b']),
   ...partial,
 })
@@ -24,11 +23,9 @@ describe('matchConditions', () => {
     expect(matchConditions(c, [{ kind: 'tag', mode: 'none', tagIds: ['x', 'a'] }])).toBe(false)
   })
 
-  it('市場、狀態', () => {
+  it('市場', () => {
     expect(matchConditions(cand(), [{ kind: 'market', marketIds: ['m2', 'm1'] }])).toBe(true)
     expect(matchConditions(cand(), [{ kind: 'market', marketIds: ['m2'] }])).toBe(false)
-    expect(matchConditions(cand(), [{ kind: 'status', statuses: ['reviewed'] }])).toBe(true)
-    expect(matchConditions(cand(), [{ kind: 'status', statuses: ['recorded', 'empty'] }])).toBe(false)
   })
 
   it('日期含頭尾、單邊不限', () => {
@@ -45,7 +42,7 @@ describe('matchConditions', () => {
       matchConditions(cand(), [
         { kind: 'tag', mode: 'all', tagIds: [] },
         { kind: 'market', marketIds: [] },
-        { kind: 'status', statuses: [] },
+        { kind: 'date', from: null, to: null },
       ]),
     ).toBe(true)
   })
@@ -66,14 +63,13 @@ describe('sanitizeConditions', () => {
       sanitizeConditions([
         { kind: 'tag', mode: 'weird', tagIds: ['a', 'a', 3] },
         { kind: 'date', from: '2026-10-01', to: 'tomorrow' },
-        { kind: 'status', statuses: ['reviewed', 'nope'] },
+        { kind: 'status', statuses: ['reviewed'] },
         { kind: 'would' },
         null,
       ]),
     ).toEqual([
       { kind: 'tag', mode: 'all', tagIds: ['a'] },
       { kind: 'date', from: '2026-10-01', to: null },
-      { kind: 'status', statuses: ['reviewed'] },
     ])
     expect(sanitizeConditions('x')).toEqual([])
   })

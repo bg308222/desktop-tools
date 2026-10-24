@@ -1,4 +1,4 @@
-import type { EntryStatus } from './domain'
+import type { Entry } from './domain'
 
 export type TagMatchMode = 'all' | 'any' | 'none'
 
@@ -9,7 +9,6 @@ export type QueryCondition =
   | { kind: 'market'; marketIds: string[] }
   /** 交易日區間（含頭尾），任一端為 null 代表不限 */
   | { kind: 'date'; from: string | null; to: string | null }
-  | { kind: 'status'; statuses: EntryStatus[] }
 
 export type ConditionKind = QueryCondition['kind']
 
@@ -19,16 +18,19 @@ export interface SavedQuery {
   conditions: QueryCondition[]
 }
 
-/** 比對所需的 entry 資訊（狀態已由圖片推導好）。 */
+/** 查詢結果的一列：entry 加上它的標籤 id。 */
+export interface QueryResultRow extends Entry {
+  tagIds: string[]
+}
+
+/** 比對所需的 entry 資訊。 */
 export interface QueryCandidate {
   marketId: string
   tradeDate: string
-  status: EntryStatus
   tagIds: Set<string>
 }
 
 const TAG_MODES: TagMatchMode[] = ['all', 'any', 'none']
-const STATUSES: EntryStatus[] = ['empty', 'recorded', 'reviewed', 'notrade', 'notrade_reviewed']
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 const strArray = (v: unknown): string[] =>
@@ -50,18 +52,13 @@ export function sanitizeConditions(raw: unknown): QueryCondition[] {
       out.push({ kind: 'market', marketIds: strArray(o.marketIds) })
     } else if (o.kind === 'date') {
       out.push({ kind: 'date', from: dateOrNull(o.from), to: dateOrNull(o.to) })
-    } else if (o.kind === 'status') {
-      const statuses = strArray(o.statuses).filter((s): s is EntryStatus =>
-        STATUSES.includes(s as EntryStatus),
-      )
-      out.push({ kind: 'status', statuses })
     }
   }
   return out
 }
 
 /**
- * 單一條件是否成立。還沒選任何值的條件（空標籤、空市場、空狀態、日期兩端都空）
+ * 單一條件是否成立。還沒選任何值的條件（空標籤、空市場、日期兩端都空）
  * 視為不限，讓編輯到一半的查詢不會突然變成零筆。
  */
 function matchOne(c: QueryCandidate, cond: QueryCondition): boolean {
@@ -76,8 +73,6 @@ function matchOne(c: QueryCandidate, cond: QueryCondition): boolean {
       return !cond.marketIds.length || cond.marketIds.includes(c.marketId)
     case 'date':
       return (!cond.from || c.tradeDate >= cond.from) && (!cond.to || c.tradeDate <= cond.to)
-    case 'status':
-      return !cond.statuses.length || cond.statuses.includes(c.status)
   }
 }
 
