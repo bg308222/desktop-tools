@@ -19,7 +19,6 @@ export interface Entry {
   tradeDate: string // YYYY-MM-DD
   actual: Wlt | null
   ideal: Wlt | null
-  would: Wlt | null // 會做（未執行）：本來會做、但因臨時有事沒做成
   noTrade: boolean // 空手日（今日無交易）
   noteJson: string | null
   createdAt: string
@@ -66,7 +65,7 @@ export interface EntryWithPresence extends Entry {
 export interface DataStatus {
   entryCount: number
   byMarket: { marketId: string; name: string; count: number }[]
-  /** SHA-256（hex）：市場、日期、三組 WLT、空手、圖種與檔名 */
+  /** SHA-256（hex）：市場、日期、實際/理想 WLT、空手、圖種與檔名 */
   hash: string
   imageCount: number
   imagePresent: number

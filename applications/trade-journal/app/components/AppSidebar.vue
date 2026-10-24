@@ -3,7 +3,7 @@ const items = [
   { to: '/overview', label: '總覽', icon: '📊' },
   { to: '/record', label: '記錄', icon: '📝' },
   { to: '/viewer', label: '復盤', icon: '🔍' },
-  { to: '/tags', label: '標籤', icon: '🏷' },
+  { to: '/queries', label: '查詢', icon: '🔎' },
   { to: '/manage', label: '標籤管理', icon: '📐' },
   { to: '/stats', label: '統計', icon: '📈' },
   { to: '/settings', label: '設定', icon: '⚙' },

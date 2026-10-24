@@ -42,6 +42,4 @@ just dev other-app         # 明確傳入時仍以參數為準
 
 ## 文件
 
-- 設計文件：`docs/superpowers/specs/`
-- 實作計畫：`docs/superpowers/plans/`
-- 互動原型：`docs/superpowers/specs/prototypes/`
+- 各 app 規格：`applications/<app>/spec.md`

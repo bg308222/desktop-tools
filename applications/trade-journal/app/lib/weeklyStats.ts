@@ -4,7 +4,6 @@ import type { Entry, Market, Wlt } from '../../shared/domain'
 export interface WltGroup {
   actual: Wlt
   ideal: Wlt
-  would: Wlt
 }
 
 export interface MarketWlt extends WltGroup {
@@ -22,7 +21,7 @@ export interface WeekStat extends WltGroup {
 }
 
 const zero = (): Wlt => ({ w: 0, l: 0, t: 0 })
-const newGroup = (): WltGroup => ({ actual: zero(), ideal: zero(), would: zero() })
+const newGroup = (): WltGroup => ({ actual: zero(), ideal: zero() })
 
 /** 就地把 b 加進 a；b 為 null 代表沒填，跳過。 */
 function addInto(a: Wlt, b: Wlt | null): void {
@@ -35,7 +34,6 @@ function addInto(a: Wlt, b: Wlt | null): void {
 function addGroup(g: WltGroup, e: Entry): void {
   addInto(g.actual, e.actual)
   addInto(g.ideal, e.ideal)
-  addInto(g.would, e.would)
 }
 
 /**
@@ -54,7 +52,7 @@ export function startOfWeek(date: string): string {
 }
 
 /**
- * 把 entry 依週分組並加總三組 WLT，含跨市場總和與各市場明細。
+ * 把 entry 依週分組並加總實際／理想 WLT，含跨市場總和與各市場明細。
  * 不看狀態直接加總；完全沒有任何 WLT 的 entry 視為無資料，不讓該週／該市場出現。
  */
 export function weeklyStats(entries: Entry[], markets: Market[], today: string): WeekStat[] {
@@ -63,7 +61,7 @@ export function weeklyStats(entries: Entry[], markets: Market[], today: string):
 
   for (const e of entries) {
     if (!known.has(e.marketId)) continue
-    if (!e.actual && !e.ideal && !e.would) continue
+    if (!e.actual && !e.ideal) continue
 
     const start = startOfWeek(e.tradeDate)
     let wk = weeks.get(start)

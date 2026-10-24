@@ -4,6 +4,7 @@ import { createEntryRepo } from '../db/repositories/entryRepo'
 import { createImageRepo } from '../db/repositories/imageRepo'
 import { createMarketRepo } from '../db/repositories/marketRepo'
 import { createTagRepo } from '../db/repositories/tagRepo'
+import { createQueryRepo } from '../db/repositories/queryRepo'
 import { createImageStore } from './imageStore'
 
 let cached: ReturnType<typeof build> | null = null
@@ -18,6 +19,7 @@ function build() {
     entries: createEntryRepo(db),
     images: createImageRepo(db),
     tags: createTagRepo(db),
+    queries: createQueryRepo(db),
     store: createImageStore(dataDir),
   }
 }

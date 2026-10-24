@@ -12,9 +12,6 @@ interface EntryRow {
   ideal_w: number | null
   ideal_l: number | null
   ideal_t: number | null
-  would_w: number | null
-  would_l: number | null
-  would_t: number | null
   no_trade: number
   note_json: string | null
   created_at: string
@@ -32,7 +29,6 @@ const toEntry = (r: EntryRow): Entry => ({
   tradeDate: r.trade_date,
   actual: toWlt(r.actual_w, r.actual_l, r.actual_t),
   ideal: toWlt(r.ideal_w, r.ideal_l, r.ideal_t),
-  would: toWlt(r.would_w, r.would_l, r.would_t),
   noTrade: !!r.no_trade,
   noteJson: r.note_json,
   createdAt: r.created_at,
@@ -44,7 +40,6 @@ export interface EntryUpsert {
   tradeDate: string
   actual?: Wlt | null
   ideal?: Wlt | null
-  would?: Wlt | null
   noTrade?: boolean
   noteJson?: string | null
 }
@@ -74,13 +69,8 @@ export function createEntryRepo(db: Db) {
     return get(marketId, date) as Entry
   }
 
-  const setWlt = (id: string, kind: 'actual' | 'ideal' | 'would', v: Wlt | null): void => {
-    const cols =
-      kind === 'actual'
-        ? ['actual_w', 'actual_l', 'actual_t']
-        : kind === 'ideal'
-          ? ['ideal_w', 'ideal_l', 'ideal_t']
-          : ['would_w', 'would_l', 'would_t']
+  const setWlt = (id: string, kind: 'actual' | 'ideal', v: Wlt | null): void => {
+    const cols = kind === 'actual' ? ['actual_w', 'actual_l', 'actual_t'] : ['ideal_w', 'ideal_l', 'ideal_t']
     db.prepare(
       `UPDATE entry SET ${cols[0]} = :w, ${cols[1]} = :l, ${cols[2]} = :t, updated_at = datetime('now') WHERE id = :id`,
     ).run({ id, w: v?.w ?? null, l: v?.l ?? null, t: v?.t ?? null })
@@ -105,7 +95,6 @@ export function createEntryRepo(db: Db) {
       const e = ensure(input.marketId, input.tradeDate)
       if ('actual' in input) setWlt(e.id, 'actual', input.actual ?? null)
       if ('ideal' in input) setWlt(e.id, 'ideal', input.ideal ?? null)
-      if ('would' in input) setWlt(e.id, 'would', input.would ?? null)
       if ('noTrade' in input) setNoTrade(e.id, input.noTrade ?? false)
       if ('noteJson' in input) setNote(e.id, input.noteJson ?? null)
       return getById(e.id) as Entry
@@ -156,20 +145,9 @@ export function createEntryRepo(db: Db) {
         images: { trade: !!r.has_trade, raw: !!r.has_raw, review: !!r.has_review },
       }))
 
-  const listByTagIds = (tagIds: string[]): Entry[] => {
-    if (tagIds.length === 0) return []
-    const placeholders = tagIds.map((_, i) => `:t${i}`).join(', ')
-    const params: Record<string, string> = {}
-    tagIds.forEach((id, i) => {
-      params[`t${i}`] = id
-    })
-    return db
-      .prepare(
-        `SELECT DISTINCT e.* FROM entry e JOIN entry_tag et ON et.entry_id = e.id WHERE et.tag_id IN (${placeholders}) ORDER BY e.trade_date`,
-      )
-      .all<EntryRow>(params)
-      .map(toEntry)
-  }
+  /** 全部 entry（供查詢比對）。 */
+  const listAll = (): Entry[] =>
+    db.prepare(`SELECT * FROM entry ORDER BY trade_date`).all<EntryRow>().map(toEntry)
 
   const remove = (id: string): void => {
     db.prepare(`DELETE FROM entry WHERE id = :id`).run({ id })
@@ -193,8 +171,8 @@ export function createEntryRepo(db: Db) {
     listInRange,
     listByMarketInRange,
     listPresenceByMarketInRange,
+    listAll,
     listByDate,
-    listByTagIds,
     distinctDates,
     remove,
   }

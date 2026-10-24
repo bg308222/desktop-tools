@@ -9,7 +9,6 @@ function e(marketId: string, tradeDate: string): Entry {
     tradeDate,
     actual: null,
     ideal: null,
-    would: null,
     noTrade: false,
     noteJson: null,
     createdAt: '',

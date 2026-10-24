@@ -14,11 +14,13 @@ interface SessionState {
     date: string | null
     singleKind: ImageKind
   }
+  queries: { selectedId: string | null }
 }
 
 const state: SessionState = reactive({
   record: { market: null, date: null },
   viewer: { weekStart: null, market: null, date: null, singleKind: 'trade' },
+  queries: { selectedId: null },
 })
 
 export function useSession(): SessionState {

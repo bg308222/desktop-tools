@@ -88,11 +88,6 @@ async function setWlt(kind: 'actual' | 'ideal', v: Wlt) {
   await api.entries.setWlt(id, kind, v)
   if (entry.value) entry.value = { ...entry.value, [kind]: v }
 }
-async function setWould(v: Wlt) {
-  const id = await ensureEntry()
-  await api.entries.setWlt(id, 'would', v)
-  if (entry.value) entry.value = { ...entry.value, would: v }
-}
 async function toggleNoTrade(v: boolean) {
   const id = await ensureEntry()
   await api.entries.setNoTrade(id, v)
@@ -334,10 +329,6 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
                 :model-value="entry?.ideal ?? null"
                 @update:model-value="(v) => setWlt('ideal', v)"
               />
-            </div>
-            <div class="flex gap-4 items-end">
-              <span class="text-xs uppercase text-dimmed w-16">會做 WLT</span>
-              <WltStepper :model-value="entry?.would ?? null" @update:model-value="setWould" />
             </div>
           </div>
         </section>

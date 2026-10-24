@@ -17,9 +17,6 @@ CREATE TABLE IF NOT EXISTS entry (
   ideal_w     INTEGER,
   ideal_l     INTEGER,
   ideal_t     INTEGER,
-  would_w     INTEGER,
-  would_l     INTEGER,
-  would_t     INTEGER,
   no_trade    INTEGER NOT NULL DEFAULT 0,
   note_json   TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
@@ -57,5 +54,13 @@ CREATE TABLE IF NOT EXISTS tag_image (
   tag_id      TEXT NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
   file_path   TEXT NOT NULL,
   sort_order  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS saved_query (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  conditions_json TEXT NOT NULL DEFAULT '[]',
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `

@@ -12,9 +12,6 @@ interface EntryRow {
   ideal_w: number | null
   ideal_l: number | null
   ideal_t: number | null
-  would_w: number | null
-  would_l: number | null
-  would_t: number | null
   no_trade: number
 }
 interface ImageRow {
@@ -37,8 +34,7 @@ export function computeDataStatus(db: Db, fileExists: (rel: string) => boolean):
 
   const entries = db
     .prepare(
-      `SELECT id, market_id, trade_date, actual_w, actual_l, actual_t, ideal_w, ideal_l, ideal_t,
-              would_w, would_l, would_t, no_trade
+      `SELECT id, market_id, trade_date, actual_w, actual_l, actual_t, ideal_w, ideal_l, ideal_t, no_trade
        FROM entry ORDER BY market_id, trade_date`,
     )
     .all<EntryRow>()
@@ -60,7 +56,6 @@ export function computeDataStatus(db: Db, fileExists: (rel: string) => boolean):
       e.trade_date,
       [e.actual_w, e.actual_l, e.actual_t],
       [e.ideal_w, e.ideal_l, e.ideal_t],
-      [e.would_w, e.would_l, e.would_t],
       e.no_trade ? 1 : 0,
       (imagesByEntry.get(e.id) ?? []).map((i) => [i.kind, i.file_path.replace(/\\/g, '/')]),
     ]

@@ -3,7 +3,7 @@ import type { Wlt } from '../../../shared/domain'
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
   const body = await readBody<{
-    wlt?: { kind: 'actual' | 'ideal' | 'would'; value: Wlt | null }
+    wlt?: { kind: 'actual' | 'ideal'; value: Wlt | null }
     noteJson?: string | null
     noTrade?: boolean
   }>(event)
