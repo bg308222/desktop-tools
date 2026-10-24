@@ -111,14 +111,40 @@ async function save() {
   draft.value = null
   selectedId.value = q.id
 }
-/** 上移／下移一格，立即存回順序。 */
-async function moveQuery(i: number, dir: 1 | -1) {
-  const j = i + dir
+// ---- 拖曳排序：拖過別的項目時即時讓位（TransitionGroup 做位移動畫），放開才存 ----
+const dragId = ref<string | null>(null)
+let orderBeforeDrag: SavedQueryWithCount[] = []
+/** 讓位動畫期間（與 .qlist-move 同長）不再換位，免得項目滑過游標下時來回抖動。 */
+const MOVE_MS = 180
+let lockedUntil = 0
+
+function onDragStart(e: DragEvent, id: string) {
+  dragId.value = id
+  orderBeforeDrag = [...queries.value]
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id) // Firefox 需要有資料才會開始拖
+  }
+}
+function onDragOver(overId: string) {
+  if (!dragId.value || performance.now() < lockedUntil) return
+  const from = queries.value.findIndex((q) => q.id === dragId.value)
+  const to = queries.value.findIndex((q) => q.id === overId)
+  if (from < 0 || to < 0 || from === to) return
   const qs = [...queries.value]
-  if (j < 0 || j >= qs.length) return
-  ;[qs[i], qs[j]] = [qs[j]!, qs[i]!]
+  qs.splice(to, 0, qs.splice(from, 1)[0]!)
   queries.value = qs
-  await api.queries.reorder(qs.map((q) => q.id))
+  lockedUntil = performance.now() + MOVE_MS
+}
+async function onDragEnd(e: DragEvent) {
+  dragId.value = null
+  // Esc 取消或放到清單外 → 還原
+  if (e.dataTransfer?.dropEffect === 'none') {
+    queries.value = orderBeforeDrag
+    return
+  }
+  const ids = queries.value.map((q) => q.id)
+  if (ids.join() !== orderBeforeDrag.map((q) => q.id).join()) await api.queries.reorder(ids)
 }
 async function removeQuery() {
   const q = selected.value
@@ -211,47 +237,40 @@ function onKey(e: KeyboardEvent) {
         <span v-if="queries.length > 1 && !draft" class="text-xs text-dimmed">← → 切換</span>
       </div>
       <UButton size="sm" icon="i-lucide-plus" block @click="startNew">新增查詢</UButton>
-      <div class="flex flex-col gap-0.5">
+      <TransitionGroup
+        tag="div"
+        name="qlist"
+        class="flex flex-col gap-0.5"
+        @dragover.prevent
+        @drop.prevent
+      >
         <div
-          v-for="(q, i) in queries"
+          v-for="q in queries"
           :key="q.id"
-          class="group flex items-center gap-1 pl-2 pr-1 py-1.5 rounded-md cursor-pointer text-sm"
-          :class="
+          draggable="true"
+          class="group flex items-center gap-1 px-1 py-1.5 rounded-md text-sm select-none"
+          :class="[
             q.id === (draft ? draft.id : selectedId)
               ? 'bg-primary/10 text-primary'
-              : 'hover:bg-elevated/50'
-          "
+              : 'hover:bg-elevated/50',
+            dragId === q.id ? 'q-dragging' : 'cursor-pointer',
+          ]"
           @click="select(q.id)"
+          @dragstart="onDragStart($event, q.id)"
+          @dragover.prevent="onDragOver(q.id)"
+          @dragend="onDragEnd"
         >
+          <UIcon
+            name="i-lucide-grip-vertical"
+            class="w-3.5 h-3.5 shrink-0 text-dimmed opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
+          />
           <span class="truncate">{{ q.name }}</span>
-          <span class="ml-auto text-xs text-dimmed shrink-0 tabular-nums group-hover:hidden"
-            >{{ q.count }} 筆</span
-          >
-          <div class="ml-auto hidden group-hover:flex shrink-0">
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-arrow-up"
-              aria-label="上移"
-              :disabled="i === 0"
-              @click.stop="moveQuery(i, -1)"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-arrow-down"
-              aria-label="下移"
-              :disabled="i === queries.length - 1"
-              @click.stop="moveQuery(i, 1)"
-            />
-          </div>
+          <span class="ml-auto pr-1 text-xs text-dimmed shrink-0 tabular-nums">{{ q.count }} 筆</span>
         </div>
-        <p v-if="loaded && !queries.length && !draft" class="text-sm text-dimmed">
-          尚無查詢，先新增一個。
-        </p>
-      </div>
+      </TransitionGroup>
+      <p v-if="loaded && !queries.length && !draft" class="text-sm text-dimmed">
+        尚無查詢，先新增一個。
+      </p>
     </div>
 
     <!-- 右側 -->
@@ -452,3 +471,16 @@ function onKey(e: KeyboardEvent) {
     />
   </div>
 </template>
+
+<style scoped>
+/* 拖曳時其他項目平滑讓位 */
+.qlist-move {
+  transition: transform 180ms ease;
+}
+/* 被拖的那一項留下虛線佔位 */
+.q-dragging {
+  opacity: 0.45;
+  outline: 1px dashed var(--ui-primary);
+  outline-offset: -1px;
+}
+</style>
