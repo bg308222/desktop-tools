@@ -1,4 +1,7 @@
 import type { Entry } from '../../shared/domain'
+import type { EntryRepo } from '../db/repositories/entryRepo'
+import type { MarketRepo } from '../db/repositories/marketRepo'
+import type { TagRepo } from '../db/repositories/tagRepo'
 import { matchConditions, type QueryCondition, type QueryResultRow } from '../../shared/query'
 
 export interface QuerySource {
@@ -9,6 +12,20 @@ export interface QuerySource {
   tagIds: Set<string>
   /** 市場 id 的顯示順序，用來排同一天的多筆 */
   marketOrder: string[]
+}
+
+/** 從 repositories 組出查詢要用的全部資料（一次讀完，多個查詢可共用）。 */
+export function loadQuerySource(repos: {
+  entries: EntryRepo
+  tags: TagRepo
+  markets: MarketRepo
+}): QuerySource {
+  return {
+    entries: repos.entries.listAll(),
+    entryTags: repos.tags.entryTagMap(),
+    tagIds: new Set(repos.tags.list().map((t) => t.id)),
+    marketOrder: repos.markets.list().map((m) => m.id),
+  }
 }
 
 /** 跑一組條件，回傳符合的 entry 與其標籤（交易日由舊到新，同日依市場順序）。 */

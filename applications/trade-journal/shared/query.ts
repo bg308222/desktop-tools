@@ -18,6 +18,11 @@ export interface SavedQuery {
   conditions: QueryCondition[]
 }
 
+/** 查詢列表的一項：附帶目前會查到的筆數。 */
+export interface SavedQueryWithCount extends SavedQuery {
+  count: number
+}
+
 /** 查詢結果的一列：entry 加上它的標籤 id。 */
 export interface QueryResultRow extends Entry {
   tagIds: string[]

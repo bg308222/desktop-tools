@@ -85,6 +85,23 @@ describe('openDb', () => {
     fs.rmSync(dir, { recursive: true, force: true })
   })
 
+  it('既有 saved_query 缺 sort_order 時會補上', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tj-sq-'))
+    const file = path.join(dir, 'old.db')
+    const raw = new Database(file)
+    raw.exec(
+      `CREATE TABLE saved_query (id TEXT PRIMARY KEY, name TEXT NOT NULL,
+        conditions_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL DEFAULT (datetime('now')));
+       INSERT INTO saved_query (id, name) VALUES ('q1', 'x');`,
+    )
+    raw.close()
+    const db = await openDb(file)
+    const row = db.prepare(`SELECT id, sort_order FROM saved_query`).get<{ id: string; sort_order: number }>()
+    expect(row).toEqual({ id: 'q1', sort_order: 0 })
+    db.close()
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
   it('舊 DB 缺欄位時 migration 會補上且保留資料', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tj-mig-'))
     const file = path.join(dir, 'old.db')

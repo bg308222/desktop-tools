@@ -66,7 +66,8 @@ WLT 不影響狀態，缺漏只以警示呈現（缺實際 WLT、缺理想 WLT�
 
 畫面：
 
-- 左欄列出已存查詢（依建立順序），「新增查詢」；未編輯時 ←→ 循環切換查詢，同一 session 內記住選取。
+- 左欄列出已存查詢與每個查詢目前會查到的筆數（「n 筆」），「新增查詢」；滑過某項時改顯示上移／下移鈕，
+  順序立即存檔，新增的查詢排在最後。未編輯時 ←→ 循環切換查詢，同一 session 內記住選取。
 - 檢視：查詢名稱、條件摘要、編輯／刪除；下方結果表格，欄位為 **市場、日期、實際 WLT、理想 WLT、標籤**。
 - 編輯／新增：名稱、條件列表（每條可移除）、「＋標籤／＋市場／＋日期」加條件；下方結果即時預覽，按儲存才寫入。
   有未儲存變更時切走會先確認。
@@ -83,11 +84,11 @@ image       (id, entry_id→entry, kind∈{trade,raw,review}, file_path, width, 
 tag         (id, name UNIQUE, color, body, created_at)
 entry_tag   (entry_id→entry, tag_id→tag)               PK(entry_id, tag_id)
 tag_image   (id, tag_id→tag, file_path, sort_order)
-saved_query (id, name, conditions_json, created_at)
+saved_query (id, name, conditions_json, sort_order, created_at)
 ```
 
 - 外鍵皆 `ON DELETE CASCADE`。`note_json` 目前存純文字備註。
-- 開 DB 時套用 schema（`IF NOT EXISTS`），並做附加式 migration：補 `no_trade`、`tag.body`，移除已淘汰的 rule 相關表。
+- 開 DB 時套用 schema（`IF NOT EXISTS`），並做附加式 migration：補 `no_trade`、`tag.body`、`saved_query.sort_order`，移除已淘汰的 rule 相關表。
 - 舊 DB 可能還留有 `would_w/l/t` 欄位（已移除的「會做 WLT」），程式不讀寫、不遷移；新 DB 不建立。
 
 ## API
@@ -110,10 +111,11 @@ saved_query (id, name, conditions_json, created_at)
 | GET | `/api/tags/:id/images` | 標籤附圖 |
 | DELETE | `/api/tag-images/:id` | 刪標籤附圖 |
 | GET/POST | `/api/tags/entry` | 取／覆寫某筆的標籤 |
-| GET | `/api/queries` | 已存查詢列表 |
+| GET | `/api/queries` | 已存查詢列表（依 sort_order），每項附 `count`＝目前會查到的筆數 |
 | POST | `/api/queries` | 新增 `{name, conditions}`，名稱不可空白 |
 | PATCH | `/api/queries/:id` | 更新 `{name?, conditions?}`，不存在回 404 |
 | DELETE | `/api/queries/:id` | 刪除 |
+| POST | `/api/queries/reorder` | 排序 `{ids}` |
 | POST | `/api/queries/run` | 跑一組條件 `{conditions}`（不必先存），回傳記錄＋每筆的 `tagIds` |
 | GET | `/api/app/status` | 資料狀態 |
 | GET | `/api/app/data-folder` | 資料夾路徑 |
@@ -126,7 +128,8 @@ saved_query (id, name, conditions_json, created_at)
 
 - 圖片欄位沒有「選擇檔案」按鈕，可以用 Ctrl/⌘+V 貼上圖片。
 - 記錄、復盤、統計、總覽都沒有「會做」；以含 `would_*` 欄位的舊 DB 開啟可正常讀寫。
-- 側欄沒有「標籤」頁、有「查詢」頁；可以新增、編輯、刪除查詢，重整後仍保留。
+- 側欄沒有「標籤」頁、有「查詢」頁；可以新增、編輯、刪除查詢、調整順序，重整後仍保留。
+- 查詢清單每項右側顯示該查詢目前會查到的筆數。
 - 查詢「標籤 全部都有 [101-開盤整理, 111-達到MM]」對範例資料（`trade-journal-20261024-1314.tgz`）回 8 筆。
 - 點結果列可看到該筆的圖、WLT、標籤、備註，並能 ←→ 翻到下一筆。
 - `bun run test` 與 `bun run typecheck` 通過。

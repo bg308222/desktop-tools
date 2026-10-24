@@ -39,6 +39,10 @@ export function openDb(source?: string): Db {
   // tag 長出內文欄位
   if (!cols('tag').has('body')) db.exec(`ALTER TABLE tag ADD COLUMN body TEXT`)
 
+  // 查詢長出排序欄位
+  if (!cols('saved_query').has('sort_order'))
+    db.exec(`ALTER TABLE saved_query ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`)
+
   // rules 併入 tags：移除已淘汰的 rule 相關表（先子後親，冪等）
   for (const t of ['entry_rule_ref', 'rule_image', 'rule', 'rule_group']) {
     db.exec(`DROP TABLE IF EXISTS ${t}`)

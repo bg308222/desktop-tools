@@ -5,7 +5,7 @@ import type {
   ConditionKind,
   QueryCondition,
   QueryResultRow,
-  SavedQuery,
+  SavedQueryWithCount,
   TagMatchMode,
 } from '../../shared/query'
 
@@ -15,7 +15,7 @@ const overlay = useOverlayGuard()
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 
 const loaded = ref(false)
-const queries = ref<SavedQuery[]>([])
+const queries = ref<SavedQueryWithCount[]>([])
 const tags = ref<Tag[]>([])
 const markets = ref<Market[]>([])
 const selectedId = ref<string | null>(null)
@@ -111,6 +111,15 @@ async function save() {
   draft.value = null
   selectedId.value = q.id
 }
+/** 上移／下移一格，立即存回順序。 */
+async function moveQuery(i: number, dir: 1 | -1) {
+  const j = i + dir
+  const qs = [...queries.value]
+  if (j < 0 || j >= qs.length) return
+  ;[qs[i], qs[j]] = [qs[j]!, qs[i]!]
+  queries.value = qs
+  await api.queries.reorder(qs.map((q) => q.id))
+}
 async function removeQuery() {
   const q = selected.value
   if (!q || !confirm(`刪除查詢「${q.name}」？`)) return
@@ -204,9 +213,9 @@ function onKey(e: KeyboardEvent) {
       <UButton size="sm" icon="i-lucide-plus" block @click="startNew">新增查詢</UButton>
       <div class="flex flex-col gap-0.5">
         <div
-          v-for="q in queries"
+          v-for="(q, i) in queries"
           :key="q.id"
-          class="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm"
+          class="group flex items-center gap-1 pl-2 pr-1 py-1.5 rounded-md cursor-pointer text-sm"
           :class="
             q.id === (draft ? draft.id : selectedId)
               ? 'bg-primary/10 text-primary'
@@ -215,7 +224,29 @@ function onKey(e: KeyboardEvent) {
           @click="select(q.id)"
         >
           <span class="truncate">{{ q.name }}</span>
-          <span class="ml-auto text-[10px] text-dimmed shrink-0">{{ q.conditions.length }} 條件</span>
+          <span class="ml-auto text-xs text-dimmed shrink-0 tabular-nums group-hover:hidden"
+            >{{ q.count }} 筆</span
+          >
+          <div class="ml-auto hidden group-hover:flex shrink-0">
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-arrow-up"
+              aria-label="上移"
+              :disabled="i === 0"
+              @click.stop="moveQuery(i, -1)"
+            />
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-arrow-down"
+              aria-label="下移"
+              :disabled="i === queries.length - 1"
+              @click.stop="moveQuery(i, 1)"
+            />
+          </div>
         </div>
         <p v-if="loaded && !queries.length && !draft" class="text-sm text-dimmed">
           尚無查詢，先新增一個。

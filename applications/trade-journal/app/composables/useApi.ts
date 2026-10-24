@@ -9,7 +9,12 @@ import type {
   TagImage,
   Wlt,
 } from '../../shared/domain'
-import type { QueryCondition, QueryResultRow, SavedQuery } from '../../shared/query'
+import type {
+  QueryCondition,
+  QueryResultRow,
+  SavedQuery,
+  SavedQueryWithCount,
+} from '../../shared/query'
 
 export interface EntryUpsertInput {
   marketId: string
@@ -102,12 +107,14 @@ export function useApi() {
         call(() => $fetch('/api/tags/entry', { method: 'POST', body: { entryId, tagIds } })),
     },
     queries: {
-      list: () => call(() => $fetch<SavedQuery[]>('/api/queries')),
+      list: () => call(() => $fetch<SavedQueryWithCount[]>('/api/queries')),
       create: (name: string, conditions: QueryCondition[]) =>
         call(() => $fetch<SavedQuery>('/api/queries', { method: 'POST', body: { name, conditions } })),
       update: (id: string, patch: { name?: string; conditions?: QueryCondition[] }) =>
         call(() => $fetch<SavedQuery>(`/api/queries/${id}`, { method: 'PATCH', body: patch })),
       remove: (id: string) => call(() => $fetch(`/api/queries/${id}`, { method: 'DELETE' })),
+      reorder: (ids: string[]) =>
+        call(() => $fetch('/api/queries/reorder', { method: 'POST', body: { ids } })),
       run: (conditions: QueryCondition[]) =>
         call(() => $fetch<QueryResultRow[]>('/api/queries/run', { method: 'POST', body: { conditions } })),
     },

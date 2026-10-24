@@ -4,7 +4,7 @@ import { createQueryRepo } from '../server/db/repositories/queryRepo'
 import { createMarketRepo } from '../server/db/repositories/marketRepo'
 import { createEntryRepo } from '../server/db/repositories/entryRepo'
 import { createTagRepo } from '../server/db/repositories/tagRepo'
-import { runQuery } from '../server/utils/runQuery'
+import { loadQuerySource, runQuery } from '../server/utils/runQuery'
 
 describe('queryRepo', () => {
   it('create / list / update / remove，條件以 JSON 存取', () => {
@@ -20,6 +20,17 @@ describe('queryRepo', () => {
 
     queries.remove(b.id)
     expect(queries.list().map((q) => q.id)).toEqual([a.id])
+  })
+
+  it('reorder 依 ids 排序，之後新增的排在最後', () => {
+    const queries = createQueryRepo(openDb(':memory:'))
+    const a = queries.create('A', [])
+    const b = queries.create('B', [])
+    const c = queries.create('C', [])
+    queries.reorder([c.id, a.id, b.id])
+    expect(queries.list().map((q) => q.name)).toEqual(['C', 'A', 'B'])
+    queries.create('D', [])
+    expect(queries.list().map((q) => q.name)).toEqual(['C', 'A', 'B', 'D'])
   })
 
   it('DB 內壞掉的 JSON 讀成空條件', () => {
@@ -45,15 +56,7 @@ describe('runQuery', () => {
     tags.setEntryTags(e1.id, [t1.id, t2.id])
     tags.setEntryTags(e2.id, [t1.id])
     const run = (conds: Parameters<typeof runQuery>[1]) =>
-      runQuery(
-        {
-          entries: entries.listAll(),
-          entryTags: tags.entryTagMap(),
-          tagIds: new Set(tags.list().map((t) => t.id)),
-          marketOrder: markets.list().map((m) => m.id),
-        },
-        conds,
-      )
+      runQuery(loadQuerySource({ entries, tags, markets }), conds)
     return { run, tags, t1, t2, nq, e1, e2, e3 }
   }
 
