@@ -28,21 +28,11 @@ describe('matchConditions', () => {
     expect(matchConditions(cand(), [{ kind: 'market', marketIds: ['m2'] }])).toBe(false)
   })
 
-  it('日期含頭尾、單邊不限', () => {
-    const d = (from: string | null, to: string | null) =>
-      matchConditions(cand(), [{ kind: 'date', from, to }])
-    expect(d('2026-10-15', '2026-10-15')).toBe(true)
-    expect(d('2026-10-16', null)).toBe(false)
-    expect(d(null, '2026-10-14')).toBe(false)
-    expect(d(null, null)).toBe(true)
-  })
-
   it('還沒選值的條件視為不限', () => {
     expect(
       matchConditions(cand(), [
         { kind: 'tag', mode: 'all', tagIds: [] },
         { kind: 'market', marketIds: [] },
-        { kind: 'date', from: null, to: null },
       ]),
     ).toBe(true)
   })
@@ -58,7 +48,7 @@ describe('matchConditions', () => {
 })
 
 describe('sanitizeConditions', () => {
-  it('丟掉不認得的條件、修正不合法的值', () => {
+  it('丟掉不認得的條件（含已淘汰的日期條件）、修正不合法的值', () => {
     expect(
       sanitizeConditions([
         { kind: 'tag', mode: 'weird', tagIds: ['a', 'a', 3] },
@@ -67,10 +57,7 @@ describe('sanitizeConditions', () => {
         { kind: 'would' },
         null,
       ]),
-    ).toEqual([
-      { kind: 'tag', mode: 'all', tagIds: ['a'] },
-      { kind: 'date', from: '2026-10-01', to: null },
-    ])
+    ).toEqual([{ kind: 'tag', mode: 'all', tagIds: ['a'] }])
     expect(sanitizeConditions('x')).toEqual([])
   })
 })

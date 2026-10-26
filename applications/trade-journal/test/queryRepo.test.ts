@@ -70,7 +70,7 @@ describe('runQuery', () => {
     expect(rows[0]!.tagIds).toEqual([])
   })
 
-  it('標籤 + 市場 + 日期組合', () => {
+  it('標籤 + 市場組合', () => {
     const { run, t1, t2, nq, e1, e2 } = setup()
     expect(ids(run([{ kind: 'tag', mode: 'all', tagIds: [t1.id, t2.id] }]))).toEqual([e1.id])
     expect(
@@ -81,7 +81,6 @@ describe('runQuery', () => {
         ]),
       ),
     ).toEqual([e2.id])
-    expect(ids(run([{ kind: 'date', from: '2026-10-09', to: null }]))).toEqual([e2.id, e1.id])
   })
 
   it('已刪除的標籤會被忽略', () => {

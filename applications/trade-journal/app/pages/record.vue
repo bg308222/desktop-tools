@@ -4,7 +4,6 @@ import { parseDate, type DateValue } from '@internationalized/date'
 import type { Entry, ImageKind, Market, Tag, Wlt } from '../../shared/domain'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
-import { isPickedFromList } from '../lib/tagInput'
 
 const api = useApi()
 const session = useSession()
@@ -28,7 +27,6 @@ const curDate = ref<string>(session.record.date ?? snapWeekday(dayjs().format('Y
 const entry = ref<Entry | null>(null)
 const slots = ref<SlotPaths>({ ...EMPTY })
 const tagNames = ref<string[]>([])
-const tagDraft = ref('')
 
 onMounted(async () => {
   const ms = await api.markets.list()
@@ -100,19 +98,6 @@ async function commitTags(names: string[]) {
   const ids = await Promise.all(names.map((n) => api.tags.ensure(n).then((t) => t.id)))
   await api.tags.setEntryTags(id, ids)
   allTags.value = await api.tags.list()
-}
-function addTag() {
-  const n = tagDraft.value.trim()
-  tagDraft.value = ''
-  if (n && !tagNames.value.includes(n)) void commitTags([...tagNames.value, n])
-}
-/** 從建議清單選到既有標籤時直接上標，不必再按 Enter。 */
-function onDraftInput(e: Event) {
-  const names = allTags.value.map((t) => t.name)
-  if (isPickedFromList((e as InputEvent).inputType, tagDraft.value, names)) addTag()
-}
-function removeTag(n: string) {
-  void commitTags(tagNames.value.filter((t) => t !== n))
 }
 
 let noteTimer: ReturnType<typeof setTimeout> | null = null
@@ -338,28 +323,11 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
           <div class="p-4 flex flex-col gap-4">
             <div>
               <label class="block text-xs uppercase text-dimmed mb-1.5">標籤</label>
-              <div class="flex flex-wrap gap-2 items-center">
-                <UBadge
-                  v-for="n in tagNames"
-                  :key="n"
-                  color="primary"
-                  variant="subtle"
-                  class="cursor-pointer"
-                  @click="removeTag(n)"
-                  >{{ n }} ✕</UBadge
-                >
-                <input
-                  v-model="tagDraft"
-                  list="tag-suggestions"
-                  placeholder="選取即上，新標籤按 Enter"
-                  class="rounded-md border border-default bg-default px-2 py-1 text-sm min-w-[160px]"
-                  @input="onDraftInput"
-                  @keydown.enter.prevent="addTag"
-                />
-                <datalist id="tag-suggestions">
-                  <option v-for="t in allTags" :key="t.id" :value="t.name" />
-                </datalist>
-              </div>
+              <TagEditor
+                :model-value="tagNames"
+                :suggestions="allTags.map((t) => t.name)"
+                @update:model-value="commitTags"
+              />
             </div>
             <div>
               <label class="block text-xs uppercase text-dimmed mb-1.5">備註</label>

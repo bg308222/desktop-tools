@@ -5,9 +5,10 @@ import type {
   ConditionKind,
   QueryCondition,
   QueryResultRow,
-  SavedQueryWithCount,
+  SavedQueryWithDates,
   TagMatchMode,
 } from '../../shared/query'
+import { countInRange, inRange } from '../lib/dateRange'
 
 const api = useApi()
 const session = useSession()
@@ -15,7 +16,10 @@ const overlay = useOverlayGuard()
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 
 const loaded = ref(false)
-const queries = ref<SavedQueryWithCount[]>([])
+const queries = ref<SavedQueryWithDates[]>([])
+/** 所有有記錄的日期：決定時間範圍拉桿的刻度 */
+const recordDates = ref<string[]>([])
+const range = useQueryRange()
 const tags = ref<Tag[]>([])
 const markets = ref<Market[]>([])
 const selectedId = ref<string | null>(null)
@@ -29,10 +33,17 @@ const marketName = (id: string) => markets.value.find((m) => m.id === id)?.name 
 const tagName = (id: string) => tags.value.find((t) => t.id === id)?.name ?? null
 
 onMounted(async () => {
-  const [qs, ts, ms] = await Promise.all([api.queries.list(), api.tags.list(), api.markets.list()])
+  loadQueryRange()
+  const [qs, ts, ms, ds] = await Promise.all([
+    api.queries.list(),
+    api.tags.list(),
+    api.markets.list(),
+    api.entries.dates(),
+  ])
   queries.value = qs
   tags.value = ts
   markets.value = ms
+  recordDates.value = ds
   const saved = session.queries.selectedId
   selectedId.value = saved && qs.some((q) => q.id === saved) ? saved : (qs[0]?.id ?? null)
   loaded.value = true
@@ -50,22 +61,46 @@ const activeConditions = computed<QueryCondition[] | null>(() =>
 )
 let runSeq = 0
 let runTimer: ReturnType<typeof setTimeout> | null = null
-watch(
-  activeConditions,
-  (conds) => {
-    if (runTimer) clearTimeout(runTimer)
-    if (!conds) {
-      results.value = []
-      return
-    }
-    const seq = ++runSeq
-    runTimer = setTimeout(async () => {
-      const rows = await api.queries.run(conds)
-      if (seq === runSeq) results.value = rows // 只收最後一次的結果
-    }, 200)
-  },
-  { deep: true, immediate: true },
-)
+function runActive(delay = 200) {
+  if (runTimer) clearTimeout(runTimer)
+  const conds = activeConditions.value
+  if (!conds) {
+    results.value = []
+    return
+  }
+  const seq = ++runSeq
+  runTimer = setTimeout(async () => {
+    const rows = await api.queries.run(conds)
+    if (seq === runSeq) results.value = rows // 只收最後一次的結果
+  }, delay)
+}
+watch(activeConditions, () => runActive(), { deep: true, immediate: true })
+
+// ---- 時間範圍：在 client 端套用，拉動時清單筆數與結果即時跟著變 ----
+const shown = computed(() => results.value.filter((r) => inRange(r.tradeDate, range.value)))
+const outside = computed(() => results.value.length - shown.value.length)
+const histDates = computed(() => results.value.map((r) => r.tradeDate))
+watch(range, () => (openIndex.value = null), { deep: true })
+
+// ---- detail 內改了標籤／備註 ----
+/** detail 開著時只就地更新該列（不重跑，免得翻頁中列表跳動）；關掉後再重跑。 */
+let rerunOnClose = false
+async function onEntryChanged(patch: { id: string; tagIds?: string[]; noteJson?: string | null }) {
+  const i = results.value.findIndex((r) => r.id === patch.id)
+  if (i >= 0) {
+    const { id: _, ...rest } = patch
+    results.value[i] = { ...results.value[i]!, ...rest }
+  }
+  if (!patch.tagIds) return
+  rerunOnClose = true
+  ;[tags.value, queries.value] = await Promise.all([api.tags.list(), api.queries.list()])
+}
+watch(openIndex, (i) => {
+  if (i == null && rerunOnClose) {
+    rerunOnClose = false
+    runActive(0)
+  }
+})
 
 // ---- 新增 / 編輯 / 刪除 ----
 const clone = (c: QueryCondition[]): QueryCondition[] => JSON.parse(JSON.stringify(c))
@@ -113,7 +148,7 @@ async function save() {
 }
 // ---- 拖曳排序：拖過別的項目時即時讓位（TransitionGroup 做位移動畫），放開才存 ----
 const dragId = ref<string | null>(null)
-let orderBeforeDrag: SavedQueryWithCount[] = []
+let orderBeforeDrag: SavedQueryWithDates[] = []
 /** 讓位動畫期間（與 .qlist-move 同長）不再換位，免得項目滑過游標下時來回抖動。 */
 const MOVE_MS = 180
 let lockedUntil = 0
@@ -155,8 +190,8 @@ async function removeQuery() {
 }
 
 // ---- 條件編輯 ----
-const KIND_LABEL: Record<ConditionKind, string> = { tag: '標籤', market: '市場', date: '日期' }
-const ADDABLE: ConditionKind[] = ['tag', 'market', 'date']
+const KIND_LABEL: Record<ConditionKind, string> = { tag: '標籤', market: '市場' }
+const ADDABLE: ConditionKind[] = ['tag', 'market']
 const TAG_MODES: { value: TagMatchMode; label: string }[] = [
   { value: 'all', label: '全部都有' },
   { value: 'any', label: '任一個有' },
@@ -165,11 +200,7 @@ const TAG_MODES: { value: TagMatchMode; label: string }[] = [
 function addCondition(kind: ConditionKind) {
   if (!draft.value) return
   const c: QueryCondition =
-    kind === 'tag'
-      ? { kind, mode: 'all', tagIds: [] }
-      : kind === 'market'
-        ? { kind, marketIds: [] }
-        : { kind, from: null, to: null }
+    kind === 'tag' ? { kind, mode: 'all', tagIds: [] } : { kind, marketIds: [] }
   draft.value.conditions.push(c)
 }
 function removeCondition(i: number) {
@@ -189,11 +220,7 @@ function describe(c: QueryCondition): string {
     const mode = TAG_MODES.find((m) => m.value === c.mode)!.label
     return `標籤 ${mode}：${names.join('、')}`
   }
-  if (c.kind === 'market') {
-    return c.marketIds.length ? `市場：${c.marketIds.map(marketName).join('、')}` : '市場：不限'
-  }
-  if (!c.from && !c.to) return '日期：不限'
-  return `日期：${c.from ?? '…'} ～ ${c.to ?? '…'}`
+  return c.marketIds.length ? `市場：${c.marketIds.map(marketName).join('、')}` : '市場：不限'
 }
 
 // ---- 結果表格 ----
@@ -265,7 +292,7 @@ function onKey(e: KeyboardEvent) {
             class="w-3.5 h-3.5 shrink-0 text-dimmed opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
           />
           <span class="truncate">{{ q.name }}</span>
-          <span class="ml-auto pr-1 text-xs text-dimmed shrink-0 tabular-nums">{{ q.count }} 筆</span>
+          <span class="ml-auto pr-1 text-xs text-dimmed shrink-0 tabular-nums">{{ countInRange(q.matchDates, range) }} 筆</span>
         </div>
       </TransitionGroup>
       <p v-if="loaded && !queries.length && !draft" class="text-sm text-dimmed">
@@ -275,6 +302,14 @@ function onKey(e: KeyboardEvent) {
 
     <!-- 右側 -->
     <div class="flex-1 min-w-0 flex flex-col p-6 gap-4">
+      <QueryRangeBar
+        v-if="loaded"
+        v-model="range"
+        :record-dates="recordDates"
+        :hist-dates="histDates"
+        class="pb-4 border-b border-default"
+      />
+
       <!-- 編輯模式 -->
       <template v-if="draft">
         <div class="flex items-center gap-2">
@@ -336,7 +371,7 @@ function onKey(e: KeyboardEvent) {
                 </div>
               </template>
 
-              <div v-else-if="c.kind === 'market'" class="flex flex-wrap gap-1.5">
+              <div v-else class="flex flex-wrap gap-1.5">
                 <button
                   v-for="m in markets"
                   :key="m.id"
@@ -352,22 +387,6 @@ function onKey(e: KeyboardEvent) {
                 </button>
               </div>
 
-              <div v-else class="flex items-center gap-2 text-sm">
-                <input
-                  type="date"
-                  :value="c.from ?? ''"
-                  class="rounded-md border border-default bg-default px-2 py-1"
-                  @change="c.from = ($event.target as HTMLInputElement).value || null"
-                />
-                <span class="text-dimmed">～</span>
-                <input
-                  type="date"
-                  :value="c.to ?? ''"
-                  class="rounded-md border border-default bg-default px-2 py-1"
-                  @change="c.to = ($event.target as HTMLInputElement).value || null"
-                />
-                <span class="text-xs text-dimmed">留空＝不限</span>
-              </div>
             </div>
 
             <UButton
@@ -420,9 +439,12 @@ function onKey(e: KeyboardEvent) {
       <template v-if="activeConditions">
         <div class="flex items-center gap-2 border-t border-default pt-3">
           <span class="text-sm font-semibold">{{ draft ? '預覽' : '結果' }}</span>
-          <span class="text-sm text-dimmed">{{ results.length }} 筆</span>
+          <span class="text-sm text-dimmed">{{ shown.length }} 筆</span>
+          <span v-if="outside" class="text-xs text-dimmed">（時間範圍外另有 {{ outside }} 筆）</span>
         </div>
-        <p v-if="!results.length" class="text-dimmed text-sm">沒有符合的記錄</p>
+        <p v-if="!shown.length" class="text-dimmed text-sm">
+          {{ results.length ? '時間範圍內沒有符合的記錄' : '沒有符合的記錄' }}
+        </p>
         <div v-else class="min-h-0 overflow-y-auto rounded-lg border border-default">
           <table class="w-full text-sm">
             <thead class="sticky top-0 bg-default">
@@ -436,7 +458,7 @@ function onKey(e: KeyboardEvent) {
             </thead>
             <tbody>
               <tr
-                v-for="(r, i) in results"
+                v-for="(r, i) in shown"
                 :key="r.id"
                 class="border-b border-default/60 last:border-0 cursor-pointer hover:bg-elevated/50"
                 @click="openIndex = i"
@@ -465,9 +487,10 @@ function onKey(e: KeyboardEvent) {
 
     <EntryDetailModal
       v-model:index="openIndex"
-      :results="results"
+      :results="shown"
       :market-name="marketName"
-      :tag-name="tagName"
+      :tags="tags"
+      @changed="onEntryChanged"
     />
   </div>
 </template>
