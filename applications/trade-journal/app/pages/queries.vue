@@ -50,22 +50,40 @@ const activeConditions = computed<QueryCondition[] | null>(() =>
 )
 let runSeq = 0
 let runTimer: ReturnType<typeof setTimeout> | null = null
-watch(
-  activeConditions,
-  (conds) => {
-    if (runTimer) clearTimeout(runTimer)
-    if (!conds) {
-      results.value = []
-      return
-    }
-    const seq = ++runSeq
-    runTimer = setTimeout(async () => {
-      const rows = await api.queries.run(conds)
-      if (seq === runSeq) results.value = rows // 只收最後一次的結果
-    }, 200)
-  },
-  { deep: true, immediate: true },
-)
+function runActive(delay = 200) {
+  if (runTimer) clearTimeout(runTimer)
+  const conds = activeConditions.value
+  if (!conds) {
+    results.value = []
+    return
+  }
+  const seq = ++runSeq
+  runTimer = setTimeout(async () => {
+    const rows = await api.queries.run(conds)
+    if (seq === runSeq) results.value = rows // 只收最後一次的結果
+  }, delay)
+}
+watch(activeConditions, () => runActive(), { deep: true, immediate: true })
+
+// ---- detail 內改了標籤／備註 ----
+/** detail 開著時只就地更新該列（不重跑，免得翻頁中列表跳動）；關掉後再重跑。 */
+let rerunOnClose = false
+async function onEntryChanged(patch: { id: string; tagIds?: string[]; noteJson?: string | null }) {
+  const i = results.value.findIndex((r) => r.id === patch.id)
+  if (i >= 0) {
+    const { id: _, ...rest } = patch
+    results.value[i] = { ...results.value[i]!, ...rest }
+  }
+  if (!patch.tagIds) return
+  rerunOnClose = true
+  ;[tags.value, queries.value] = await Promise.all([api.tags.list(), api.queries.list()])
+}
+watch(openIndex, (i) => {
+  if (i == null && rerunOnClose) {
+    rerunOnClose = false
+    runActive(0)
+  }
+})
 
 // ---- 新增 / 編輯 / 刪除 ----
 const clone = (c: QueryCondition[]): QueryCondition[] => JSON.parse(JSON.stringify(c))
@@ -467,7 +485,8 @@ function onKey(e: KeyboardEvent) {
       v-model:index="openIndex"
       :results="results"
       :market-name="marketName"
-      :tag-name="tagName"
+      :tags="tags"
+      @changed="onEntryChanged"
     />
   </div>
 </template>

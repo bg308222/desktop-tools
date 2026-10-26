@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { ImageKind, Wlt } from '../../shared/domain'
+import type { ImageKind, Tag, Wlt } from '../../shared/domain'
 import type { QueryResultRow } from '../../shared/query'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { stepIndex } from '../lib/viewerNav'
@@ -8,10 +8,14 @@ import { stepIndex } from '../lib/viewerNav'
 const props = defineProps<{
   results: QueryResultRow[]
   marketName: (id: string) => string
-  tagName: (id: string) => string | null
+  tags: Tag[]
   index: number | null
 }>()
-const emit = defineEmits<{ 'update:index': [number | null] }>()
+const emit = defineEmits<{
+  'update:index': [number | null]
+  /** 標籤或備註已寫入 server；由頁面更新結果列與標籤清單 */
+  changed: [patch: { id: string; tagIds?: string[]; noteJson?: string | null }]
+}>()
 
 const api = useApi()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
@@ -30,15 +34,47 @@ const open = computed({
 const entry = computed(() => (props.index != null ? props.results[props.index] ?? null : null))
 const tagNames = computed(() =>
   (entry.value?.tagIds ?? [])
-    .map(props.tagName)
+    .map((id) => props.tags.find((t) => t.id === id)?.name)
     .filter((n): n is string => !!n)
     .sort(),
 )
+const suggestions = computed(() => props.tags.map((t) => t.name))
 
+async function commitTags(names: string[]) {
+  const e = entry.value
+  if (!e) return
+  const ids = await Promise.all(names.map((n) => api.tags.ensure(n).then((t) => t.id)))
+  await api.tags.setEntryTags(e.id, ids)
+  emit('changed', { id: e.id, tagIds: ids })
+}
+
+// 備註：打字 500ms 後存；換筆、關閉前先把還沒存的送出（綁定當時那一筆，不會寫到下一筆）
+let pendingNote: { id: string; value: string } | null = null
+let noteTimer: ReturnType<typeof setTimeout> | null = null
+function changeNote(value: string) {
+  const e = entry.value
+  if (!e) return
+  pendingNote = { id: e.id, value }
+  if (noteTimer) clearTimeout(noteTimer)
+  noteTimer = setTimeout(flushNote, 500)
+}
+function flushNote() {
+  if (noteTimer) clearTimeout(noteTimer)
+  noteTimer = null
+  const p = pendingNote
+  pendingNote = null
+  if (!p) return
+  void api.entries.setNote(p.id, p.value).then(() =>
+    emit('changed', { id: p.id, noteJson: p.value }),
+  )
+}
+
+// 看 id 而非整個 entry：就地更新標籤／備註會換掉列物件，但不該重抓圖
 watch(
-  entry,
-  async (e) => {
-    slots.value = e ? toSlotPaths(await api.images.getByEntry(e.id)) : { ...EMPTY }
+  () => entry.value?.id,
+  async (id, prev) => {
+    if (prev) flushNote()
+    slots.value = id ? toSlotPaths(await api.images.getByEntry(id)) : { ...EMPTY }
     // 換筆後若當前圖種沒圖，落到有圖的 kind
     const present = KIND_ORDER.filter((k) => slots.value[k])
     if (present.length && !slots.value[singleKind.value]) singleKind.value = present[0]!
@@ -59,6 +95,8 @@ function cycleKind() {
 
 function onKey(e: KeyboardEvent) {
   if (props.index == null) return
+  const el = document.activeElement
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return // 編輯標籤/備註時讓路
   if (e.key === 'ArrowRight') move(1)
   else if (e.key === 'ArrowLeft') move(-1)
   else if (e.key === '1') singleKind.value = 'trade'
@@ -76,7 +114,10 @@ const fmtWlt = (v: Wlt | null) => (v ? `${v.w}W ${v.l}L ${v.t}T` : '—')
 const overlay = useOverlayGuard()
 watch(open, (o, prev) => {
   if (o) overlay.open()
-  else if (prev) overlay.close()
+  else if (prev) {
+    flushNote()
+    overlay.close()
+  }
 })
 /** 中鍵（滾輪）關閉，與圖片燈箱一致；燈箱自己會攔下中鍵，不會連 detail 一起關。 */
 function onMouseDown(e: MouseEvent) {
@@ -91,6 +132,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('mousedown', onMouseDown)
+  flushNote()
   if (open.value) overlay.close()
 })
 
@@ -146,19 +188,22 @@ const position = computed(() =>
 
             <div>
               <p class="text-xs font-medium text-dimmed mb-1.5">標籤</p>
-              <div v-if="tagNames.length" class="flex flex-wrap gap-1.5">
-                <UBadge v-for="n in tagNames" :key="n" color="primary" variant="subtle">{{
-                  n
-                }}</UBadge>
-              </div>
-              <p v-else class="text-sm text-dimmed">—</p>
+              <TagEditor
+                :model-value="tagNames"
+                :suggestions="suggestions"
+                @update:model-value="commitTags"
+              />
             </div>
 
-            <div>
+            <div class="flex-1 min-h-[160px] flex flex-col">
               <p class="text-xs font-medium text-dimmed mb-1.5">備註</p>
-              <!-- prettier-ignore -->
-              <p v-if="entry.noteJson" class="text-sm leading-relaxed whitespace-pre-wrap break-words">{{ entry.noteJson }}</p>
-              <p v-else class="text-sm text-dimmed">—</p>
+              <textarea
+                :key="entry.id"
+                :value="entry.noteJson ?? ''"
+                placeholder="備註…"
+                class="flex-1 w-full resize-none rounded-md border border-default bg-default px-3 py-2 text-sm leading-relaxed"
+                @input="changeNote(($event.target as HTMLTextAreaElement).value)"
+              />
             </div>
           </aside>
         </div>
