@@ -111,7 +111,7 @@ onUnmounted(() => {
       v-if="open"
       class="fixed inset-0 z-50 bg-black/85 flex flex-col"
       @click.self="close"
-      @mousedown.middle.prevent="close"
+      @mousedown.middle.prevent.stop="close"
     >
       <!-- 工具列 -->
       <div class="flex items-center justify-between px-4 py-2 text-white/90 text-sm">

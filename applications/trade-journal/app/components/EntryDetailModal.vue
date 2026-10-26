@@ -78,9 +78,19 @@ watch(open, (o, prev) => {
   if (o) overlay.open()
   else if (prev) overlay.close()
 })
-onMounted(() => window.addEventListener('keydown', onKey))
+/** 中鍵（滾輪）關閉，與圖片燈箱一致；燈箱自己會攔下中鍵，不會連 detail 一起關。 */
+function onMouseDown(e: MouseEvent) {
+  if (props.index == null || e.button !== 1) return
+  e.preventDefault()
+  open.value = false
+}
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  window.addEventListener('mousedown', onMouseDown)
+})
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener('mousedown', onMouseDown)
   if (open.value) overlay.close()
 })
 
@@ -154,7 +164,7 @@ const position = computed(() =>
         </div>
 
         <p class="text-xs text-dimmed mt-3">
-          ←→ 換上下一筆 · 1/2/3 切交易圖/原圖/復盤圖 · Space 循環 · 點圖放大
+          ←→ 換上下一筆 · 1/2/3 切交易圖/原圖/復盤圖 · Space 循環 · 點圖放大 · 中鍵關閉
         </p>
       </div>
     </template>
