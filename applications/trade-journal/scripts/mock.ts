@@ -14,7 +14,7 @@ import { createEntryRepo } from '../server/db/repositories/entryRepo'
 import { createImageRepo } from '../server/db/repositories/imageRepo'
 import { createTagRepo } from '../server/db/repositories/tagRepo'
 import { createImageStore } from '../server/utils/imageStore'
-import type { ImageKind, Wlt } from '../shared/domain'
+import type { ImageKind } from '../shared/domain'
 
 const dataDir = process.env.DATA_DIR || './data'
 
@@ -114,18 +114,14 @@ function reset() {
   fs.rmSync(join(dataDir, 'images'), { recursive: true, force: true })
 }
 
-function randomWlt(maxTrades: number): Wlt {
+/** 1～maxTrades 筆 R：約四成虧損（-2～-0.5R）、其餘 0～4R，半格為單位。 */
+function randomTrades(maxTrades: number): number[] {
   const total = 1 + Math.floor(rand() * maxTrades)
-  let w = 0
-  let l = 0
-  let t = 0
+  const out: number[] = []
   for (let i = 0; i < total; i++) {
-    const roll = rand()
-    if (roll < 0.5) w++
-    else if (roll < 0.85) l++
-    else t++
+    out.push(chance(0.4) ? pick([-2, -1.5, -1.5, -1.2, -1, -0.5]) : Math.round(rand() * 8) / 2)
   }
-  return { w, l, t }
+  return out
 }
 
 function run() {
@@ -203,32 +199,29 @@ function run() {
       entryCount++
       const caption = `${m.name} ${dayjs(date).format('M/D')}`
 
-      // 約 15% 為空手日（兩種：沒機會 / 臨時有事）
+      // 約 15% 為空手日（實際 0 筆；兩種：沒機會 / 臨時有事）
       if (chance(0.15)) {
-        entries.setNoTrade(e.id, true)
         noTradeCount++
-        if (chance(0.5)) {
-          // 臨時有事：其實有機會 → 保留原圖/復盤圖/理想 WLT
-          putImage(e.id, 'raw', caption)
-          putImage(e.id, 'review', caption)
-          imageCount += 2
-          entries.setWlt(e.id, 'ideal', randomWlt(2))
-        }
-        // 另一半「沒機會」：不放圖、理想 WLT 不填
+        // 復盤過才看得出是空手（否則就是待記錄）
+        putImage(e.id, 'raw', caption)
+        putImage(e.id, 'review', caption)
+        imageCount += 2
+        // 臨時有事：其實有機會 → 填理想交易；沒機會則理想也是 0 筆
+        if (chance(0.5)) entries.setTrades(e.id, 'ideal', randomTrades(2))
         continue
       }
 
-      // 交易圖 + 實際 WLT（一定有）
+      // 交易圖 + 實際交易（一定有）
       putImage(e.id, 'trade', caption)
       imageCount++
-      entries.setWlt(e.id, 'actual', randomWlt(4))
+      entries.setTrades(e.id, 'actual', randomTrades(4))
 
-      // 約 7 成完成復盤（原圖 + 復盤圖 + 理想 WLT）
+      // 約 7 成完成復盤（原圖 + 復盤圖 + 理想交易）
       if (chance(0.7)) {
         putImage(e.id, 'raw', caption)
         putImage(e.id, 'review', caption)
         imageCount += 2
-        entries.setWlt(e.id, 'ideal', randomWlt(3))
+        entries.setTrades(e.id, 'ideal', randomTrades(3))
       }
 
       // 標籤 1~3 個

@@ -1,4 +1,5 @@
 import type { Entry } from '../../shared/domain'
+import { tally, type WltRule } from './wlt'
 
 /** 一天的偏差：只看兩個數（無 T）。 */
 export interface Deviation {
@@ -8,33 +9,14 @@ export interface Deviation {
   over: number
 }
 
-const ZERO = { w: 0, l: 0, t: 0 }
-
-/**
- * 計算某 entry 的偏差。需 ideal 非 null 才算得出（未復盤回 null）。
- *
- * actual 為 null 通常代表「還沒填」→ 回 null；但空手日例外：
- * 它的 actual 語意上就是 0W 0L（沒下單），只是不會被寫進 DB，
- * 因此在這裡補回 0，否則空手日的少賺永遠算不出來、熱度底色永遠是空的。
- */
-export function deviation(
-  entry: Pick<Entry, 'actual' | 'ideal' | 'noTrade'>,
-): Deviation | null {
-  const { ideal } = entry
-  const actual = entry.actual ?? (entry.noTrade ? ZERO : null)
-  if (!actual || !ideal) return null
+/** 兩邊的 R 先依 WLT 區間換算成次數再比；沒填＝0 筆，所以永遠算得出來。 */
+export function deviation(entry: Pick<Entry, 'actual' | 'ideal'>, rule: WltRule): Deviation {
+  const actual = tally(entry.actual, rule)
+  const ideal = tally(entry.ideal, rule)
   return {
     miss: Math.max(0, ideal.w - actual.w),
     over: Math.max(0, actual.l - ideal.l),
   }
-}
-
-/**
- * 字典序 W > L 比較（給「高偏差待複習」排序用）：
- * 回傳 < 0 表示 a 應排在 b 前面（a 偏差較大）。先比少賺，平手再比多賠。
- */
-export function compareDeviation(a: Deviation, b: Deviation): number {
-  return b.miss - a.miss || b.over - a.over
 }
 
 /** 月曆「偏差熱度」上色級距：以少賺(W) 為主，0～5+。 */

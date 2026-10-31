@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { Market, Tag, Wlt } from '../../shared/domain'
+import type { Market, Tag } from '../../shared/domain'
 import type {
   ConditionKind,
   QueryCondition,
@@ -228,7 +228,6 @@ function describe(c: QueryCondition): string {
 }
 
 // ---- 結果表格 ----
-const fmtWlt = (v: Wlt | null) => (v ? `${v.w}W ${v.l}L ${v.t}T` : '—')
 const fmtDate = (d: string) => `${dayjs(d).format('YYYY/M/D')} 週${WEEKDAY[dayjs(d).day()]}`
 const rowTags = (r: QueryResultRow) =>
   r.tagIds
@@ -447,12 +446,8 @@ function onKey(e: KeyboardEvent) {
               >
                 <td class="px-3 py-2 font-medium">{{ marketName(r.marketId) }}</td>
                 <td class="px-3 py-2 font-mono whitespace-nowrap">{{ fmtDate(r.tradeDate) }}</td>
-                <td class="px-3 py-2 font-mono tabular-nums whitespace-nowrap">
-                  {{ fmtWlt(r.actual) }}
-                </td>
-                <td class="px-3 py-2 font-mono tabular-nums whitespace-nowrap">
-                  {{ fmtWlt(r.ideal) }}
-                </td>
+                <td class="px-3 py-2"><TradeSummary :trades="r.actual" /></td>
+                <td class="px-3 py-2"><TradeSummary :trades="r.ideal" /></td>
                 <td class="px-3 py-2">
                   <div class="flex flex-wrap gap-1">
                     <UBadge v-for="n in rowTags(r)" :key="n" color="primary" variant="subtle" size="sm">{{

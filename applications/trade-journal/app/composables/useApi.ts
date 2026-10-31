@@ -7,7 +7,6 @@ import type {
   ImageKind,
   Tag,
   TagImage,
-  Wlt,
 } from '../../shared/domain'
 import type {
   QueryCondition,
@@ -15,13 +14,13 @@ import type {
   SavedQuery,
   SavedQueryWithMatches,
 } from '../../shared/query'
+import type { TradeKind } from '../../shared/trades'
 
 export interface EntryUpsertInput {
   marketId: string
   tradeDate: string
-  actual?: Wlt | null
-  ideal?: Wlt | null
-  noTrade?: boolean
+  actual?: number[]
+  ideal?: number[]
   noteJson?: string | null
 }
 
@@ -63,10 +62,8 @@ export function useApi() {
         call(() => $fetch<Entry | null>('/api/entries', { query: { market: marketId, date } })),
       upsert: (input: EntryUpsertInput) =>
         call(() => $fetch<Entry>('/api/entries', { method: 'PUT', body: input })),
-      setWlt: (id: string, kind: 'actual' | 'ideal', value: Wlt | null) =>
-        call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { wlt: { kind, value } } })),
-      setNoTrade: (id: string, noTrade: boolean) =>
-        call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { noTrade } })),
+      setTrades: (id: string, kind: TradeKind, value: number[]) =>
+        call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { trades: { kind, value } } })),
       setNote: (id: string, noteJson: string | null) =>
         call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { noteJson } })),
       dates: () => call(() => $fetch<string[]>('/api/entries/dates')),

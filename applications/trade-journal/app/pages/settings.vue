@@ -137,7 +137,7 @@ async function onImportPick(e: Event) {
           >
             {{ status.hash.slice(0, 12) }}
           </button>
-          <div class="text-xs text-dimmed mt-0.5">市場、日期、WLT、空手、圖種與檔名</div>
+          <div class="text-xs text-dimmed mt-0.5">市場、日期、實際／理想 R、圖種與檔名</div>
         </div>
       </div>
       <div v-if="status?.missing.length" class="mt-3 text-sm">

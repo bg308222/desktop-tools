@@ -1,66 +1,37 @@
 import { describe, it, expect } from 'vitest'
-import { deviation, compareDeviation, heatLevel } from '../app/lib/deviation'
+import { deviation, heatLevel } from '../app/lib/deviation'
+import { DEFAULT_RULE } from '../app/lib/wlt'
 
+// 預設區間：L < -1、-1 ≤ T ≤ 2、2 < W
 describe('deviation', () => {
-  it('actual 或 ideal 缺 → null', () => {
-    expect(
-      deviation({ actual: null, ideal: { w: 3, l: 0, t: 0 }, noTrade: false }),
-    ).toBeNull()
-    expect(
-      deviation({ actual: { w: 1, l: 0, t: 0 }, ideal: null, noTrade: false }),
-    ).toBeNull()
+  it('兩邊都沒填 → 0 / 0', () => {
+    expect(deviation({ actual: [], ideal: [] }, DEFAULT_RULE)).toEqual({ miss: 0, over: 0 })
   })
 
-  it('少賺 = max(0, 理想W − 實際W)、多賠 = max(0, 實際L − 理想L)', () => {
-    // 理想 4W0L、實際 2W1L → 少賺 = 4-2 = 2、多賠 = 1-0 = 1
-    const d = deviation({
-      actual: { w: 2, l: 1, t: 0 },
-      ideal: { w: 4, l: 0, t: 0 },
-      noTrade: false,
-    })
+  it('R 先換算成 WLT 再比：少賺看 W、多賠看 L，T 不計', () => {
+    // 實際 1W 1L 1T；理想 3W 0L
+    const d = deviation({ actual: [3, -2, 0.5], ideal: [3, 4, 2.5] }, DEFAULT_RULE)
     expect(d).toEqual({ miss: 2, over: 1 })
   })
 
-  it('做得比理想好時夾在 0（不為負）', () => {
-    const d = deviation({
-      actual: { w: 5, l: 0, t: 0 },
-      ideal: { w: 3, l: 2, t: 0 },
-      noTrade: false,
-    })
+  it('實際比理想好時不為負', () => {
+    const d = deviation({ actual: [3, 3, 3], ideal: [3, -1.5, -1.5] }, DEFAULT_RULE)
     expect(d).toEqual({ miss: 0, over: 0 })
   })
 
-  describe('空手日：actual 視為 0W 0L，全額計入少賺', () => {
-    it('空手 + 理想 3W → 少賺 3、多賠 0', () => {
-      const d = deviation({
-        actual: null,
-        ideal: { w: 3, l: 0, t: 0 },
-          noTrade: true,
-      })
-      expect(d).toEqual({ miss: 3, over: 0 })
-    })
-
-    it('空手 + 理想也有 L → 多賠仍為 0（沒下單不可能多賠）', () => {
-      const d = deviation({
-        actual: null,
-        ideal: { w: 2, l: 1, t: 0 },
-          noTrade: true,
-      })
-      expect(d).toEqual({ miss: 2, over: 0 })
-    })
-
-    it('空手但尚未填理想 WLT → null（還沒復盤，算不出）', () => {
-      expect(deviation({ actual: null, ideal: null, noTrade: true })).toBeNull()
-    })
+  it('空手（實際 0 筆）時理想的 W 全額計入少賺', () => {
+    expect(deviation({ actual: [], ideal: [3, 2.5, -2] }, DEFAULT_RULE)).toEqual({ miss: 2, over: 0 })
   })
 
-  it('compareDeviation 字典序：先比少賺，平手比多賠', () => {
-    expect(compareDeviation({ miss: 3, over: 0 }, { miss: 2, over: 9 })).toBeLessThan(0)
-    expect(compareDeviation({ miss: 2, over: 1 }, { miss: 2, over: 3 })).toBeGreaterThan(0)
-    expect(compareDeviation({ miss: 2, over: 2 }, { miss: 2, over: 2 })).toBe(0)
+  it('依區間規則換算', () => {
+    const rule = { ...DEFAULT_RULE, hiTo: 'W' } as const // 剛好 2R 算 W
+    expect(deviation({ actual: [], ideal: [2] }, DEFAULT_RULE).miss).toBe(0)
+    expect(deviation({ actual: [], ideal: [2] }, rule).miss).toBe(1)
   })
+})
 
-  it('heatLevel：0 為無、封頂 5', () => {
+describe('heatLevel', () => {
+  it('0 為無、封頂 5', () => {
     expect(heatLevel(0)).toBe(0)
     expect(heatLevel(-3)).toBe(0)
     expect(heatLevel(3)).toBe(3)

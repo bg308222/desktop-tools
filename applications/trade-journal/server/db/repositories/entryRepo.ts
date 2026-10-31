@@ -1,35 +1,35 @@
 import { randomUUID } from 'node:crypto'
 import type { Db } from '../types'
-import type { Entry, EntryWithPresence, Wlt } from '../../../shared/domain'
+import type { Entry, EntryWithPresence } from '../../../shared/domain'
+import { sanitizeTrades, type TradeKind } from '../../../shared/trades'
 
 interface EntryRow {
   id: string
   market_id: string
   trade_date: string
-  actual_w: number | null
-  actual_l: number | null
-  actual_t: number | null
-  ideal_w: number | null
-  ideal_l: number | null
-  ideal_t: number | null
-  no_trade: number
+  actual_r: string | null
+  ideal_r: string | null
   note_json: string | null
   created_at: string
   updated_at: string
 }
 
-function toWlt(w: number | null, l: number | null, t: number | null): Wlt | null {
-  if (w == null && l == null && t == null) return null
-  return { w: w ?? 0, l: l ?? 0, t: t ?? 0 }
+/** DB 內的 R 陣列 JSON；null 或壞資料都當 0 筆。 */
+function toTrades(json: string | null): number[] {
+  if (!json) return []
+  try {
+    return sanitizeTrades(JSON.parse(json))
+  } catch {
+    return []
+  }
 }
 
 const toEntry = (r: EntryRow): Entry => ({
   id: r.id,
   marketId: r.market_id,
   tradeDate: r.trade_date,
-  actual: toWlt(r.actual_w, r.actual_l, r.actual_t),
-  ideal: toWlt(r.ideal_w, r.ideal_l, r.ideal_t),
-  noTrade: !!r.no_trade,
+  actual: toTrades(r.actual_r),
+  ideal: toTrades(r.ideal_r),
   noteJson: r.note_json,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -38,9 +38,8 @@ const toEntry = (r: EntryRow): Entry => ({
 export interface EntryUpsert {
   marketId: string
   tradeDate: string
-  actual?: Wlt | null
-  ideal?: Wlt | null
-  noTrade?: boolean
+  actual?: number[]
+  ideal?: number[]
   noteJson?: string | null
 }
 
@@ -69,18 +68,12 @@ export function createEntryRepo(db: Db) {
     return get(marketId, date) as Entry
   }
 
-  const setWlt = (id: string, kind: 'actual' | 'ideal', v: Wlt | null): void => {
-    const cols = kind === 'actual' ? ['actual_w', 'actual_l', 'actual_t'] : ['ideal_w', 'ideal_l', 'ideal_t']
+  /** 覆寫某一組逐筆 R；空陣列存成 NULL。 */
+  const setTrades = (id: string, kind: TradeKind, rs: unknown): void => {
+    const clean = sanitizeTrades(rs)
     db.prepare(
-      `UPDATE entry SET ${cols[0]} = :w, ${cols[1]} = :l, ${cols[2]} = :t, updated_at = datetime('now') WHERE id = :id`,
-    ).run({ id, w: v?.w ?? null, l: v?.l ?? null, t: v?.t ?? null })
-  }
-
-  const setNoTrade = (id: string, value: boolean): void => {
-    db.prepare(`UPDATE entry SET no_trade = :v, updated_at = datetime('now') WHERE id = :id`).run({
-      id,
-      v: value ? 1 : 0,
-    })
+      `UPDATE entry SET ${kind === 'actual' ? 'actual_r' : 'ideal_r'} = :v, updated_at = datetime('now') WHERE id = :id`,
+    ).run({ id, v: clean.length ? JSON.stringify(clean) : null })
   }
 
   const setNote = (id: string, noteJson: string | null): void => {
@@ -93,9 +86,8 @@ export function createEntryRepo(db: Db) {
   const upsert = (input: EntryUpsert): Entry =>
     db.transaction(() => {
       const e = ensure(input.marketId, input.tradeDate)
-      if ('actual' in input) setWlt(e.id, 'actual', input.actual ?? null)
-      if ('ideal' in input) setWlt(e.id, 'ideal', input.ideal ?? null)
-      if ('noTrade' in input) setNoTrade(e.id, input.noTrade ?? false)
+      if ('actual' in input) setTrades(e.id, 'actual', input.actual)
+      if ('ideal' in input) setTrades(e.id, 'ideal', input.ideal)
       if ('noteJson' in input) setNote(e.id, input.noteJson ?? null)
       return getById(e.id) as Entry
     })
@@ -148,8 +140,7 @@ export function createEntryRepo(db: Db) {
     getById,
     ensure,
     upsert,
-    setWlt,
-    setNoTrade,
+    setTrades,
     setNote,
     listPresenceByMarketInRange,
     listAll,

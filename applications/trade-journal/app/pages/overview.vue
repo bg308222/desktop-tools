@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import type { EntryStatus, EntryWithPresence, Market } from '../../shared/domain'
 import { deriveStatus, warnings } from '../lib/completeness'
 import { deviation, heatLevel } from '../lib/deviation'
+import { tally } from '../lib/wlt'
 
 const api = useApi()
 const session = useSession()
@@ -17,7 +18,6 @@ const TAG_LABEL: Record<EntryStatus, string> = {
   empty: '待記錄',
   recorded: '待復盤',
   reviewed: '已復盤',
-  notrade: '空手',
   notrade_reviewed: '空手✓',
 }
 
@@ -26,6 +26,7 @@ const markets = ref<Market[]>([])
 const curMarket = ref<string | null>(null)
 const entries = ref<Map<string, EntryWithPresence>>(new Map())
 const menuOpen = ref(false)
+const rule = useWltRule()
 
 const marketName = (id: string | null) => markets.value.find((m) => m.id === id)?.name ?? '—'
 const marketOrder = computed(() => markets.value.map((m) => m.id))
@@ -121,19 +122,26 @@ interface CellView {
   warns: string[]
   title: string
 }
+const NO_IMAGES = { trade: false, raw: false, review: false }
+const NO_TRADES = { actual: [], ideal: [] }
 function cellView(date: string): CellView {
   const e = entries.value.get(date)
-  const status = e ? deriveStatus(e, e.images) : 'empty'
-  const warns = e ? warnings(e, e.images) : []
-  const dev = e ? deviation(e) : null
-  const bgClass = dev ? 'h-' + heatLevel(dev.miss) : status === 'empty' ? 'cell-empty' : 'cell-plain'
+  const images = e?.images ?? NO_IMAGES
+  const status = deriveStatus(e ?? null, images)
+  const warns = warnings(images)
+  const dev = deviation(e ?? NO_TRADES, rule.value)
+  // 待記錄又沒有偏差＝還沒動過的日子：灰框、不顯示偏差；其餘一律依少賺上熱度色
+  const blank = status === 'empty' && !dev.miss && !dev.over
+  const bgClass = blank ? 'cell-empty' : 'h-' + heatLevel(dev.miss)
   let wlt = ''
-  if (status === 'notrade' || status === 'notrade_reviewed') wlt = '空手'
-  else if (e?.actual) wlt = `${e.actual.w}W ${e.actual.l}L`
-  const devText = dev ? `少${dev.miss} · 多${dev.over}` : ''
+  if (e?.actual.length) {
+    const a = tally(e.actual, rule.value)
+    wlt = `${a.w}W ${a.l}L`
+  } else if (status === 'notrade_reviewed') wlt = '空手'
+  const devText = blank ? '' : `少${dev.miss} · 多${dev.over}`
   const title =
     `${dayjs(date).format('M/D')} ${wd(date)}｜${TAG_LABEL[status]}` +
-    (dev ? `｜少${dev.miss} · 多${dev.over}` : '') +
+    (devText ? `｜${devText}` : '') +
     (warns.length ? `\n⚠ ${warns.join('\n⚠ ')}` : '')
   return { status, label: TAG_LABEL[status], bgClass, wlt, devText, warns, title }
 }
@@ -291,7 +299,7 @@ onUnmounted(() => {
         <div class="ov-legend flex items-center gap-x-3 gap-y-1.5 flex-wrap text-[11px] text-dimmed px-3.5 py-2.5 border-t border-default">
           <span class="ov-tag t-reviewed">已復盤</span>
           <span class="ov-tag t-recorded">待復盤</span>
-          <span class="ov-tag t-notrade">空手</span>
+          <span class="ov-tag t-notrade_reviewed">空手✓</span>
           <span class="ov-tag t-empty">待記錄</span>
           <span class="flex items-center gap-1 ml-1">
             <span>背景=少賺熱度</span>
@@ -401,11 +409,6 @@ button:not(:disabled) {
   opacity: 0.72;
 }
 
-/* 中性底（無偏差資料的日子） */
-.cell-plain {
-  background: var(--ui-bg-elevated);
-  border-color: var(--ui-border);
-}
 .cell-empty {
   background: transparent;
   border-style: dashed;
@@ -413,7 +416,7 @@ button:not(:disabled) {
   color: var(--ui-text-dimmed);
 }
 
-/* 偏差熱度底色（僅已復盤的日子）：兩主題共用同一組淺色 chip，明確指定文字色確保可讀 */
+/* 偏差熱度底色（待記錄且無偏差的日子除外）：兩主題共用同一組淺色 chip，明確指定文字色確保可讀 */
 .h-0 { background: #f0fdf4; border-color: #dcfce7; color: #14532d; }
 .h-1 { background: #fff7ed; border-color: #fed7aa; color: #7c2d12; }
 .h-2 { background: #ffedd5; border-color: #fdba74; color: #7c2d12; }
@@ -434,7 +437,6 @@ button:not(:disabled) {
 .t-empty { background: #e4e4e7; color: #52525b; }
 .t-recorded { background: #fde68a; color: #78350f; }
 .t-reviewed { background: #bbf7d0; color: #14532d; }
-.t-notrade,
 .t-notrade_reviewed { background: #bfdbfe; color: #1e3a8a; }
 
 /* 少/多 標色 */
