@@ -1,5 +1,4 @@
 import { reactive } from 'vue'
-import type { ImageKind } from '../../shared/domain'
 
 /**
  * 單一 session 內的瀏覽狀態（記憶體，不落地）。
@@ -8,18 +7,11 @@ import type { ImageKind } from '../../shared/domain'
  */
 interface SessionState {
   record: { market: string | null; date: string | null }
-  viewer: {
-    weekStart: string | null
-    market: string | null
-    date: string | null
-    singleKind: ImageKind
-  }
   queries: { selectedId: string | null }
 }
 
 const state: SessionState = reactive({
   record: { market: null, date: null },
-  viewer: { weekStart: null, market: null, date: null, singleKind: 'trade' },
   queries: { selectedId: null },
 })
 
