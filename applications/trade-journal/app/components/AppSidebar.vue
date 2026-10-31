@@ -4,7 +4,6 @@ const items = [
   { to: '/record', label: '記錄', icon: '📝' },
   { to: '/queries', label: '查詢', icon: '🔎' },
   { to: '/manage', label: '標籤管理', icon: '📐' },
-  { to: '/stats', label: '統計', icon: '📈' },
   { to: '/settings', label: '設定', icon: '⚙' },
 ]
 

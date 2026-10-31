@@ -100,23 +100,6 @@ export function createEntryRepo(db: Db) {
       return getById(e.id) as Entry
     })
 
-  const listInRange = (from: string, to: string): Entry[] =>
-    db
-      .prepare(`SELECT * FROM entry WHERE trade_date >= :from AND trade_date <= :to ORDER BY trade_date`)
-      .all<EntryRow>({ from, to })
-      .map(toEntry)
-
-  const listByMarketInRange = (marketId: string, from: string, to: string): Entry[] =>
-    db
-      .prepare(
-        `SELECT * FROM entry WHERE market_id = :m AND trade_date >= :from AND trade_date <= :to ORDER BY trade_date`,
-      )
-      .all<EntryRow>({ m: marketId, from, to })
-      .map(toEntry)
-
-  const listByDate = (date: string): Entry[] =>
-    db.prepare(`SELECT * FROM entry WHERE trade_date = :d`).all<EntryRow>({ d: date }).map(toEntry)
-
   /** 某市場、某日期範圍的 entry，附帶三種圖是否存在（供總覽算狀態）。 */
   const listPresenceByMarketInRange = (
     marketId: string,
@@ -168,11 +151,8 @@ export function createEntryRepo(db: Db) {
     setWlt,
     setNoTrade,
     setNote,
-    listInRange,
-    listByMarketInRange,
     listPresenceByMarketInRange,
     listAll,
-    listByDate,
     distinctDates,
     remove,
   }

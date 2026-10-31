@@ -69,12 +69,6 @@ export function useApi() {
         call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { noTrade } })),
       setNote: (id: string, noteJson: string | null) =>
         call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { noteJson } })),
-      listInRange: (from: string, to: string) =>
-        call(() => $fetch<Entry[]>('/api/entries', { query: { from, to } })),
-      listByMarketInRange: (marketId: string, from: string, to: string) =>
-        call(() => $fetch<Entry[]>('/api/entries', { query: { market: marketId, from, to } })),
-      listByDate: (date: string) =>
-        call(() => $fetch<Entry[]>('/api/entries', { query: { date } })),
       dates: () => call(() => $fetch<string[]>('/api/entries/dates')),
     },
     images: {

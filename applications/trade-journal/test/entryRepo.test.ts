@@ -20,7 +20,7 @@ describe('entryRepo', () => {
     const b = entries.upsert({ marketId, tradeDate: '2026-07-14', actual: { w: 3, l: 0, t: 1 } })
     expect(a.id).toBe(b.id)
     expect(b.actual).toEqual({ w: 3, l: 0, t: 1 })
-    expect(entries.listInRange('2026-07-01', '2026-07-31')).toHaveLength(1)
+    expect(entries.listAll()).toHaveLength(1)
   })
 
   it('部分 upsert 不覆蓋未提供的欄位', async () => {
@@ -38,15 +38,6 @@ describe('entryRepo', () => {
     const e = entries.upsert({ marketId, tradeDate: '2026-07-14', actual: { w: 1, l: 1, t: 1 } })
     entries.setWlt(e.id, 'actual', null)
     expect(entries.getById(e.id)?.actual).toBeNull()
-  })
-
-  it('listByMarketInRange 依日期排序', async () => {
-    const { entries, marketId } = await setup()
-    entries.upsert({ marketId, tradeDate: '2026-07-16' })
-    entries.upsert({ marketId, tradeDate: '2026-07-14' })
-    entries.upsert({ marketId, tradeDate: '2026-07-15' })
-    const dates = entries.listByMarketInRange(marketId, '2026-07-13', '2026-07-17').map((e) => e.tradeDate)
-    expect(dates).toEqual(['2026-07-14', '2026-07-15', '2026-07-16'])
   })
 
   it('setNoTrade 映射正確', async () => {
