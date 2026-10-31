@@ -12,6 +12,7 @@ const importing = ref(false)
 const status = ref<DataStatus | null>(null)
 const statusLoading = ref(false)
 const KIND_LABEL: Record<ImageKind, string> = { trade: '交易圖', raw: '原圖', review: '復盤圖' }
+const wltRule = useWltRule()
 
 async function reload() {
   markets.value = await api.markets.list()
@@ -136,7 +137,7 @@ async function onImportPick(e: Event) {
           >
             {{ status.hash.slice(0, 12) }}
           </button>
-          <div class="text-xs text-dimmed mt-0.5">市場、日期、WLT、空手、圖種與檔名</div>
+          <div class="text-xs text-dimmed mt-0.5">市場、日期、實際／理想 R、圖種與檔名</div>
         </div>
       </div>
       <div v-if="status?.missing.length" class="mt-3 text-sm">
@@ -147,6 +148,14 @@ async function onImportPick(e: Event) {
           </li>
         </ul>
       </div>
+    </div>
+
+    <div class="border border-default rounded-lg p-4">
+      <p class="font-semibold">WLT 區間</p>
+      <p class="text-xs text-dimmed mt-0.5 mb-1">
+        每筆交易的 R 依此歸為 W／L／T。存在這個瀏覽器，所有頁面的 WLT 與偏差即時套用。
+      </p>
+      <WltRuleEditor v-model="wltRule" />
     </div>
 
     <div class="border border-default rounded-lg p-4">

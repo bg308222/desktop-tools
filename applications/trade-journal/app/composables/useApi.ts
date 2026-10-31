@@ -7,21 +7,20 @@ import type {
   ImageKind,
   Tag,
   TagImage,
-  Wlt,
 } from '../../shared/domain'
 import type {
   QueryCondition,
   QueryResultRow,
   SavedQuery,
-  SavedQueryWithDates,
+  SavedQueryWithMatches,
 } from '../../shared/query'
+import type { TradeKind } from '../../shared/trades'
 
 export interface EntryUpsertInput {
   marketId: string
   tradeDate: string
-  actual?: Wlt | null
-  ideal?: Wlt | null
-  noTrade?: boolean
+  actual?: number[]
+  ideal?: number[]
   noteJson?: string | null
 }
 
@@ -63,18 +62,10 @@ export function useApi() {
         call(() => $fetch<Entry | null>('/api/entries', { query: { market: marketId, date } })),
       upsert: (input: EntryUpsertInput) =>
         call(() => $fetch<Entry>('/api/entries', { method: 'PUT', body: input })),
-      setWlt: (id: string, kind: 'actual' | 'ideal', value: Wlt | null) =>
-        call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { wlt: { kind, value } } })),
-      setNoTrade: (id: string, noTrade: boolean) =>
-        call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { noTrade } })),
+      setTrades: (id: string, kind: TradeKind, value: number[]) =>
+        call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { trades: { kind, value } } })),
       setNote: (id: string, noteJson: string | null) =>
         call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { noteJson } })),
-      listInRange: (from: string, to: string) =>
-        call(() => $fetch<Entry[]>('/api/entries', { query: { from, to } })),
-      listByMarketInRange: (marketId: string, from: string, to: string) =>
-        call(() => $fetch<Entry[]>('/api/entries', { query: { market: marketId, from, to } })),
-      listByDate: (date: string) =>
-        call(() => $fetch<Entry[]>('/api/entries', { query: { date } })),
       dates: () => call(() => $fetch<string[]>('/api/entries/dates')),
     },
     images: {
@@ -107,7 +98,7 @@ export function useApi() {
         call(() => $fetch('/api/tags/entry', { method: 'POST', body: { entryId, tagIds } })),
     },
     queries: {
-      list: () => call(() => $fetch<SavedQueryWithDates[]>('/api/queries')),
+      list: () => call(() => $fetch<SavedQueryWithMatches[]>('/api/queries')),
       create: (name: string, conditions: QueryCondition[]) =>
         call(() => $fetch<SavedQuery>('/api/queries', { method: 'POST', body: { name, conditions } })),
       update: (id: string, patch: { name?: string; conditions?: QueryCondition[] }) =>

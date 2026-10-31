@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import { parseDate, type DateValue } from '@internationalized/date'
-import type { Entry, ImageKind, Market, Tag, Wlt } from '../../shared/domain'
+import type { Entry, ImageKind, Market, Tag } from '../../shared/domain'
+import type { TradeKind } from '../../shared/trades'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
 
@@ -27,6 +28,8 @@ const curDate = ref<string>(session.record.date ?? snapWeekday(dayjs().format('Y
 const entry = ref<Entry | null>(null)
 const slots = ref<SlotPaths>({ ...EMPTY })
 const tagNames = ref<string[]>([])
+/** 畫面上的逐筆 R（即改即顯示，延遲存檔） */
+const trades = ref<Record<TradeKind, number[]>>({ actual: [], ideal: [] })
 
 onMounted(async () => {
   const ms = await api.markets.list()
@@ -53,6 +56,7 @@ async function reload() {
   if (!curMarket.value) return
   const e = await api.entries.get(curMarket.value, curDate.value)
   entry.value = e
+  trades.value = { actual: e?.actual ?? [], ideal: e?.ideal ?? [] }
   if (e) {
     slots.value = toSlotPaths(await api.images.getByEntry(e.id))
     tagNames.value = (await api.tags.getEntryTags(e.id)).map((t) => t.name)
@@ -61,7 +65,10 @@ async function reload() {
     tagNames.value = []
   }
 }
-watch([curMarket, curDate], reload)
+watch([curMarket, curDate], () => {
+  flushTrades() // 換頁前先把上一格的 R 存掉（綁定當時的市場／日期）
+  void reload()
+})
 
 async function ensureEntry(): Promise<string> {
   if (entry.value) return entry.value.id
@@ -81,16 +88,31 @@ async function removeImage(kind: ImageKind) {
   slots.value = { ...slots.value, [kind]: null }
 }
 
-async function setWlt(kind: 'actual' | 'ideal', v: Wlt) {
-  const id = await ensureEntry()
-  await api.entries.setWlt(id, kind, v)
-  if (entry.value) entry.value = { ...entry.value, [kind]: v }
+// 逐筆 R：停止輸入 500ms 後存；換市場／日期、離開頁面前先送出
+let pendingTrades: { marketId: string; tradeDate: string; kind: TradeKind; value: number[] }[] = []
+let tradesTimer: ReturnType<typeof setTimeout> | null = null
+function changeTrades(kind: TradeKind, value: number[]) {
+  trades.value = { ...trades.value, [kind]: value }
+  const at = { marketId: curMarket.value as string, tradeDate: curDate.value }
+  pendingTrades = [...pendingTrades.filter((p) => p.kind !== kind), { ...at, kind, value }]
+  if (tradesTimer) clearTimeout(tradesTimer)
+  tradesTimer = setTimeout(flushTrades, 500)
 }
-async function toggleNoTrade(v: boolean) {
-  const id = await ensureEntry()
-  await api.entries.setNoTrade(id, v)
-  if (entry.value) entry.value = { ...entry.value, noTrade: v }
+function flushTrades() {
+  if (tradesTimer) clearTimeout(tradesTimer)
+  tradesTimer = null
+  const list = pendingTrades
+  pendingTrades = []
+  for (const p of list) {
+    void api.entries
+      .upsert({ marketId: p.marketId, tradeDate: p.tradeDate, [p.kind]: p.value })
+      .then((e) => {
+        // 還停在同一格：記下 entry（第一次填時才建立），畫面上的 R 以本地為準
+        if (curMarket.value === p.marketId && curDate.value === p.tradeDate) entry.value = e
+      })
+  }
 }
+onBeforeUnmount(flushTrades)
 
 async function commitTags(names: string[]) {
   tagNames.value = names
@@ -172,7 +194,7 @@ onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 const status = computed(() =>
-  deriveStatus(entry.value, {
+  deriveStatus(trades.value, {
     trade: !!slots.value.trade,
     raw: !!slots.value.raw,
     review: !!slots.value.review,
@@ -258,15 +280,6 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
     <!-- 內容 -->
     <div class="flex-1 min-h-0 overflow-y-auto p-6">
       <div class="flex flex-col gap-4 max-w-[940px] mx-auto">
-        <div class="flex items-center gap-3">
-          <USwitch
-            :model-value="entry?.noTrade ?? false"
-            label="空手（今日無交易）"
-            @update:model-value="toggleNoTrade"
-          />
-          <span class="text-xs text-dimmed">開啟後交易圖可傳可不傳，不影響狀態</span>
-        </div>
-
         <section class="rounded-lg border border-default overflow-hidden">
           <div class="px-4 py-3 border-b border-default bg-elevated/40 font-semibold">交易</div>
           <div class="p-4 flex flex-col gap-4">
@@ -279,11 +292,12 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
                 @remove="removeImage('trade')"
               />
             </div>
-            <div class="flex gap-4 items-end">
-              <span class="text-xs uppercase text-dimmed w-16">實際 WLT</span>
-              <WltStepper
-                :model-value="entry?.actual ?? null"
-                @update:model-value="(v) => setWlt('actual', v)"
+            <div>
+              <label class="block text-xs uppercase text-dimmed mb-1.5">實際交易（每筆 R，沒有交易＝空手）</label>
+              <TradeRail
+                :model-value="trades.actual"
+                empty-text="0 筆（空手）"
+                @update:model-value="(v) => changeTrades('actual', v)"
               />
             </div>
           </div>
@@ -308,11 +322,11 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
                 @remove="removeImage('review')"
               />
             </div>
-            <div class="flex gap-4 items-end">
-              <span class="text-xs uppercase text-dimmed w-16">理想 WLT</span>
-              <WltStepper
-                :model-value="entry?.ideal ?? null"
-                @update:model-value="(v) => setWlt('ideal', v)"
+            <div>
+              <label class="block text-xs uppercase text-dimmed mb-1.5">理想交易（復盤後認為該做的每筆 R）</label>
+              <TradeRail
+                :model-value="trades.ideal"
+                @update:model-value="(v) => changeTrades('ideal', v)"
               />
             </div>
           </div>

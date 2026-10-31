@@ -1,15 +1,17 @@
-import type { Wlt } from '../../../shared/domain'
+import type { TradeKind } from '../../../shared/trades'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
   const body = await readBody<{
-    wlt?: { kind: 'actual' | 'ideal'; value: Wlt | null }
+    trades?: { kind: TradeKind; value: number[] }
     noteJson?: string | null
-    noTrade?: boolean
   }>(event)
   const { entries } = useRepos()
-  if (body.wlt) entries.setWlt(id, body.wlt.kind, body.wlt.value)
-  if (typeof body.noTrade === 'boolean') entries.setNoTrade(id, body.noTrade)
+  if (body.trades) {
+    if (body.trades.kind !== 'actual' && body.trades.kind !== 'ideal')
+      throw createError({ statusCode: 400, message: 'trades.kind 需為 actual 或 ideal' })
+    entries.setTrades(id, body.trades.kind, body.trades.value)
+  }
   if ('noteJson' in body) entries.setNote(id, body.noteJson ?? null)
   return { ok: true }
 })

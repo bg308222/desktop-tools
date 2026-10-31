@@ -10,7 +10,6 @@ const MAP: Record<
   empty: { color: 'neutral', label: '待記錄' },
   recorded: { color: 'warning', label: '已記錄（待復盤）' },
   reviewed: { color: 'success', label: '已復盤' },
-  notrade: { color: 'info', label: '空手' },
   notrade_reviewed: { color: 'success', label: '空手·已復盤' },
 }
 

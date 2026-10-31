@@ -16,56 +16,44 @@ async function setup() {
 describe('entryRepo', () => {
   it('upsert 同 (market,date) 不重複，會更新', async () => {
     const { entries, marketId } = await setup()
-    const a = entries.upsert({ marketId, tradeDate: '2026-07-14', actual: { w: 2, l: 1, t: 0 } })
-    const b = entries.upsert({ marketId, tradeDate: '2026-07-14', actual: { w: 3, l: 0, t: 1 } })
+    const a = entries.upsert({ marketId, tradeDate: '2026-07-14', actual: [2, -1] })
+    const b = entries.upsert({ marketId, tradeDate: '2026-07-14', actual: [3] })
     expect(a.id).toBe(b.id)
-    expect(b.actual).toEqual({ w: 3, l: 0, t: 1 })
-    expect(entries.listInRange('2026-07-01', '2026-07-31')).toHaveLength(1)
+    expect(b.actual).toEqual([3])
+    expect(entries.listAll()).toHaveLength(1)
   })
 
   it('部分 upsert 不覆蓋未提供的欄位', async () => {
     const { entries, marketId } = await setup()
-    entries.upsert({ marketId, tradeDate: '2026-07-14', actual: { w: 1, l: 0, t: 0 }, noteJson: '{"a":1}' })
+    entries.upsert({ marketId, tradeDate: '2026-07-14', actual: [1], noteJson: '{"a":1}' })
     // 只更新 ideal，note 與 actual 應保留
-    const e = entries.upsert({ marketId, tradeDate: '2026-07-14', ideal: { w: 2, l: 0, t: 0 } })
-    expect(e.actual).toEqual({ w: 1, l: 0, t: 0 })
-    expect(e.ideal).toEqual({ w: 2, l: 0, t: 0 })
+    const e = entries.upsert({ marketId, tradeDate: '2026-07-14', ideal: [2.5, -1] })
+    expect(e.actual).toEqual([1])
+    expect(e.ideal).toEqual([2.5, -1])
     expect(e.noteJson).toBe('{"a":1}')
   })
 
-  it('setWlt 可清空為 null', async () => {
-    const { entries, marketId } = await setup()
-    const e = entries.upsert({ marketId, tradeDate: '2026-07-14', actual: { w: 1, l: 1, t: 1 } })
-    entries.setWlt(e.id, 'actual', null)
-    expect(entries.getById(e.id)?.actual).toBeNull()
-  })
-
-  it('listByMarketInRange 依日期排序', async () => {
-    const { entries, marketId } = await setup()
-    entries.upsert({ marketId, tradeDate: '2026-07-16' })
-    entries.upsert({ marketId, tradeDate: '2026-07-14' })
-    entries.upsert({ marketId, tradeDate: '2026-07-15' })
-    const dates = entries.listByMarketInRange(marketId, '2026-07-13', '2026-07-17').map((e) => e.tradeDate)
-    expect(dates).toEqual(['2026-07-14', '2026-07-15', '2026-07-16'])
-  })
-
-  it('setNoTrade 映射正確', async () => {
+  it('沒填的 R 讀出為空陣列；setTrades 可清空', async () => {
     const { entries, marketId } = await setup()
     const e = entries.upsert({ marketId, tradeDate: '2026-07-14' })
-    entries.setNoTrade(e.id, true)
-    expect(entries.getById(e.id)!.noTrade).toBe(true)
+    expect(e.actual).toEqual([])
+    expect(e.ideal).toEqual([])
+    entries.setTrades(e.id, 'actual', [1, 2])
+    entries.setTrades(e.id, 'actual', [])
+    expect(entries.getById(e.id)?.actual).toEqual([])
   })
 
-  it('upsert 可帶 noTrade', async () => {
+  it('setTrades 只收有限數字、四捨五入到兩位小數', async () => {
     const { entries, marketId } = await setup()
-    const e = entries.upsert({ marketId, tradeDate: '2026-07-15', noTrade: true })
-    expect(e.noTrade).toBe(true)
+    const e = entries.upsert({ marketId, tradeDate: '2026-07-14' })
+    entries.setTrades(e.id, 'ideal', [1.234, 'x', null, Infinity, -0.5])
+    expect(entries.getById(e.id)?.ideal).toEqual([1.23, -0.5])
   })
 
   it('listPresenceByMarketInRange：圖片存在旗標、範圍與市場過濾', async () => {
     const { entries, images, markets, marketId } = await setup()
     const other = markets.create('小道瓊')
-    const e1 = entries.upsert({ marketId, tradeDate: '2026-07-14', actual: { w: 1, l: 0, t: 0 } })
+    const e1 = entries.upsert({ marketId, tradeDate: '2026-07-14', actual: [1] })
     images.upsert(e1.id, 'trade', 'a.png', null, null)
     images.upsert(e1.id, 'review', 'b.png', null, null)
     entries.upsert({ marketId, tradeDate: '2026-07-15' }) // 無圖

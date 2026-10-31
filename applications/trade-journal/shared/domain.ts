@@ -5,21 +5,16 @@ export interface Market {
   archived: boolean
 }
 
-export interface Wlt {
-  w: number
-  l: number
-  t: number
-}
-
 export type ImageKind = 'trade' | 'raw' | 'review'
 
 export interface Entry {
   id: string
   marketId: string
   tradeDate: string // YYYY-MM-DD
-  actual: Wlt | null
-  ideal: Wlt | null
-  noTrade: boolean // 空手日（今日無交易）
+  /** 實際交易的逐筆 R；空陣列＝0 筆（空手） */
+  actual: number[]
+  /** 理想交易（復盤後認為該怎麼做）的逐筆 R */
+  ideal: number[]
   noteJson: string | null
   createdAt: string
   updatedAt: string
@@ -48,7 +43,7 @@ export interface TagImage {
   sortOrder: number
 }
 
-export type EntryStatus = 'empty' | 'recorded' | 'reviewed' | 'notrade' | 'notrade_reviewed'
+export type EntryStatus = 'empty' | 'recorded' | 'reviewed' | 'notrade_reviewed'
 
 export interface ImagePresence {
   trade: boolean
@@ -65,7 +60,7 @@ export interface EntryWithPresence extends Entry {
 export interface DataStatus {
   entryCount: number
   byMarket: { marketId: string; name: string; count: number }[]
-  /** SHA-256（hex）：市場、日期、實際/理想 WLT、空手、圖種與檔名 */
+  /** SHA-256（hex）：市場、日期、實際/理想 R、圖種與檔名 */
   hash: string
   imageCount: number
   imagePresent: number

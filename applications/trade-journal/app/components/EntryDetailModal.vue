@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { ImageKind, Tag, Wlt } from '../../shared/domain'
+import type { ImageKind, Tag } from '../../shared/domain'
 import type { QueryResultRow } from '../../shared/query'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { stepIndex } from '../lib/viewerNav'
+import { deriveStatus } from '../lib/completeness'
+import { classify, fmtR } from '../lib/wlt'
+import { WLT_STYLE } from '../lib/wltStyle'
 
 const props = defineProps<{
   results: QueryResultRow[]
@@ -18,6 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const api = useApi()
+const rule = useWltRule()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const KIND_ORDER: ImageKind[] = ['trade', 'raw', 'review']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
@@ -109,8 +113,13 @@ function onKey(e: KeyboardEvent) {
 }
 const kindLabel = (k: ImageKind) => (k === 'trade' ? '交易圖' : k === 'raw' ? '原圖' : '復盤圖')
 const KIND_KEY: Record<ImageKind, string> = { trade: '1', raw: '2', review: '3' }
-/** 未填顯示破折號，不要湊 0 混淆「真的是 0」與「還沒填」。 */
-const fmtWlt = (v: Wlt | null) => (v ? `${v.w}W ${v.l}L ${v.t}T` : '—')
+const status = computed(() =>
+  deriveStatus(entry.value, {
+    trade: !!slots.value.trade,
+    raw: !!slots.value.raw,
+    review: !!slots.value.review,
+  }),
+)
 const overlay = useOverlayGuard()
 watch(open, (o, prev) => {
   if (o) overlay.open()
@@ -173,17 +182,22 @@ const position = computed(() =>
 
           <aside v-if="entry" class="w-[260px] shrink-0 flex flex-col gap-4 overflow-y-auto">
             <div class="flex flex-col gap-1.5">
-              <div class="flex items-baseline gap-2">
-                <span class="text-xs font-medium text-dimmed w-8">實際</span>
-                <span class="text-sm font-mono tabular-nums">{{ fmtWlt(entry.actual) }}</span>
+              <StatusBadge :status="status" class="self-start" />
+              <div v-for="k in (['actual', 'ideal'] as const)" :key="k" class="flex flex-col gap-1">
+                <div class="flex items-baseline gap-2">
+                  <span class="text-xs font-medium text-dimmed w-8">{{ k === 'actual' ? '實際' : '理想' }}</span>
+                  <TradeSummary :trades="entry[k]" class="text-sm" />
+                </div>
+                <div v-if="entry[k].length" class="flex flex-wrap gap-1 pl-10">
+                  <span
+                    v-for="(r, i) in entry[k]"
+                    :key="i"
+                    class="px-1.5 rounded border text-xs font-mono tabular-nums"
+                    :class="[WLT_STYLE[classify(r, rule)].soft, WLT_STYLE[classify(r, rule)].text]"
+                    >{{ fmtR(r) }}</span
+                  >
+                </div>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="text-xs font-medium text-dimmed w-8">理想</span>
-                <span class="text-sm font-mono tabular-nums">{{ fmtWlt(entry.ideal) }}</span>
-              </div>
-              <UBadge v-if="entry.noTrade" color="info" variant="subtle" class="self-start"
-                >空手</UBadge
-              >
             </div>
 
             <div>

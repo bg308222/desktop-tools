@@ -42,13 +42,13 @@ describe('computeDataStatus', () => {
     expect(computeDataStatus(db, all).hash).toBe(computeDataStatus(db, all).hash)
   })
 
-  it('改 WLT / 空手 / 圖片會改變 hash', async () => {
+  it('改實際 / 理想 R、圖片會改變 hash', async () => {
     const { db, entries, images, e1 } = await setup()
     const h0 = computeDataStatus(db, all).hash
-    entries.setWlt(e1.id, 'actual', { w: 1, l: 0, t: 0 })
+    entries.setTrades(e1.id, 'actual', [1])
     const h1 = computeDataStatus(db, all).hash
     expect(h1).not.toBe(h0)
-    entries.setNoTrade(e1.id, true)
+    entries.setTrades(e1.id, 'ideal', [2.5])
     const h2 = computeDataStatus(db, all).hash
     expect(h2).not.toBe(h1)
     images.remove(e1.id, 'raw')

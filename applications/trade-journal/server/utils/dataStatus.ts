@@ -6,13 +6,8 @@ interface EntryRow {
   id: string
   market_id: string
   trade_date: string
-  actual_w: number | null
-  actual_l: number | null
-  actual_t: number | null
-  ideal_w: number | null
-  ideal_l: number | null
-  ideal_t: number | null
-  no_trade: number
+  actual_r: string | null
+  ideal_r: string | null
 }
 interface ImageRow {
   entry_id: string
@@ -34,7 +29,7 @@ export function computeDataStatus(db: Db, fileExists: (rel: string) => boolean):
 
   const entries = db
     .prepare(
-      `SELECT id, market_id, trade_date, actual_w, actual_l, actual_t, ideal_w, ideal_l, ideal_t, no_trade
+      `SELECT id, market_id, trade_date, actual_r, ideal_r
        FROM entry ORDER BY market_id, trade_date`,
     )
     .all<EntryRow>()
@@ -54,9 +49,8 @@ export function computeDataStatus(db: Db, fileExists: (rel: string) => boolean):
     const line = [
       e.market_id,
       e.trade_date,
-      [e.actual_w, e.actual_l, e.actual_t],
-      [e.ideal_w, e.ideal_l, e.ideal_t],
-      e.no_trade ? 1 : 0,
+      e.actual_r,
+      e.ideal_r,
       (imagesByEntry.get(e.id) ?? []).map((i) => [i.kind, i.file_path.replace(/\\/g, '/')]),
     ]
     hash.update(JSON.stringify(line) + '\n')

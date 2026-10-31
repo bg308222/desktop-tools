@@ -28,12 +28,6 @@ export function inRange(date: string, r: DateRange): boolean {
   return (!r.from || date >= r.from) && (!r.to || date <= r.to)
 }
 
-export function countInRange(dates: string[], r: DateRange): number {
-  let n = 0
-  for (const d of dates) if (inRange(d, r)) n++
-  return n
-}
-
 /** 拉桿的刻度：以天為單位，0 ＝ min，span ＝ max。 */
 export interface RangeScale {
   min: string
