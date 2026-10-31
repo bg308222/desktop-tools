@@ -10,7 +10,7 @@ describe('queryRepo', () => {
   it('create / list / update / remove，條件以 JSON 存取', () => {
     const queries = createQueryRepo(openDb(':memory:'))
     const a = queries.create('開盤整理', [{ kind: 'tag', mode: 'all', tagIds: ['t1'] }])
-    const b = queries.create('NQ', [{ kind: 'market', marketIds: ['m1'] }])
+    const b = queries.create('NQ', [{ kind: 'tag', mode: 'any', tagIds: ['t2'] }])
     expect(queries.list().map((q) => q.name)).toEqual(['開盤整理', 'NQ'])
     expect(queries.get(a.id)?.conditions).toEqual([{ kind: 'tag', mode: 'all', tagIds: ['t1'] }])
 
@@ -57,7 +57,7 @@ describe('runQuery', () => {
     tags.setEntryTags(e2.id, [t1.id])
     const run = (conds: Parameters<typeof runQuery>[1]) =>
       runQuery(loadQuerySource({ entries, tags, markets }), conds)
-    return { run, tags, t1, t2, nq, e1, e2, e3 }
+    return { run, tags, t1, t2, e1, e2, e3 }
   }
 
   const ids = (rows: { id: string }[]) => rows.map((r) => r.id)
@@ -70,14 +70,14 @@ describe('runQuery', () => {
     expect(rows[0]!.tagIds).toEqual([])
   })
 
-  it('標籤 + 市場組合', () => {
-    const { run, t1, t2, nq, e1, e2 } = setup()
+  it('標籤條件組合（AND）', () => {
+    const { run, t1, t2, e1, e2 } = setup()
     expect(ids(run([{ kind: 'tag', mode: 'all', tagIds: [t1.id, t2.id] }]))).toEqual([e1.id])
     expect(
       ids(
         run([
           { kind: 'tag', mode: 'any', tagIds: [t1.id] },
-          { kind: 'market', marketIds: [nq.id] },
+          { kind: 'tag', mode: 'none', tagIds: [t2.id] },
         ]),
       ),
     ).toEqual([e2.id])

@@ -13,7 +13,7 @@ import type {
   QueryCondition,
   QueryResultRow,
   SavedQuery,
-  SavedQueryWithDates,
+  SavedQueryWithMatches,
 } from '../../shared/query'
 
 export interface EntryUpsertInput {
@@ -101,7 +101,7 @@ export function useApi() {
         call(() => $fetch('/api/tags/entry', { method: 'POST', body: { entryId, tagIds } })),
     },
     queries: {
-      list: () => call(() => $fetch<SavedQueryWithDates[]>('/api/queries')),
+      list: () => call(() => $fetch<SavedQueryWithMatches[]>('/api/queries')),
       create: (name: string, conditions: QueryCondition[]) =>
         call(() => $fetch<SavedQuery>('/api/queries', { method: 'POST', body: { name, conditions } })),
       update: (id: string, patch: { name?: string; conditions?: QueryCondition[] }) =>

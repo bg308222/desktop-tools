@@ -5,10 +5,11 @@ import type {
   ConditionKind,
   QueryCondition,
   QueryResultRow,
-  SavedQueryWithDates,
+  SavedQueryWithMatches,
   TagMatchMode,
 } from '../../shared/query'
-import { countInRange, inRange } from '../lib/dateRange'
+import { inRange } from '../lib/dateRange'
+import { countInScope, inMarkets } from '../lib/queryScope'
 
 const api = useApi()
 const session = useSession()
@@ -16,10 +17,12 @@ const overlay = useOverlayGuard()
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 
 const loaded = ref(false)
-const queries = ref<SavedQueryWithDates[]>([])
+const queries = ref<SavedQueryWithMatches[]>([])
 /** 所有有記錄的日期：決定時間範圍拉桿的刻度 */
 const recordDates = ref<string[]>([])
 const range = useQueryRange()
+/** 市場範圍：空陣列＝全部 */
+const marketSel = useQueryMarkets()
 const tags = ref<Tag[]>([])
 const markets = ref<Market[]>([])
 const selectedId = ref<string | null>(null)
@@ -34,6 +37,7 @@ const tagName = (id: string) => tags.value.find((t) => t.id === id)?.name ?? nul
 
 onMounted(async () => {
   loadQueryRange()
+  loadQueryMarkets()
   const [qs, ts, ms, ds] = await Promise.all([
     api.queries.list(),
     api.tags.list(),
@@ -43,6 +47,9 @@ onMounted(async () => {
   queries.value = qs
   tags.value = ts
   markets.value = ms
+  // 已刪除的市場從選取中拿掉；剩下等於全選時回到「全部」
+  const kept = marketSel.value.filter((id) => ms.some((m) => m.id === id))
+  marketSel.value = kept.length === ms.length ? [] : kept
   recordDates.value = ds
   const saved = session.queries.selectedId
   selectedId.value = saved && qs.some((q) => q.id === saved) ? saved : (qs[0]?.id ?? null)
@@ -76,11 +83,13 @@ function runActive(delay = 200) {
 }
 watch(activeConditions, () => runActive(), { deep: true, immediate: true })
 
-// ---- 時間範圍：在 client 端套用，拉動時清單筆數與結果即時跟著變 ----
-const shown = computed(() => results.value.filter((r) => inRange(r.tradeDate, range.value)))
+// ---- 全域範圍（市場＋時間）：在 client 端套用，改動時清單筆數與結果即時跟著變 ----
+const inMarket = computed(() => results.value.filter((r) => inMarkets(r.marketId, marketSel.value)))
+const shown = computed(() => inMarket.value.filter((r) => inRange(r.tradeDate, range.value)))
 const outside = computed(() => results.value.length - shown.value.length)
-const histDates = computed(() => results.value.map((r) => r.tradeDate))
-watch(range, () => (openIndex.value = null), { deep: true })
+/** 直方圖：套了市場、未套時間範圍 */
+const histDates = computed(() => inMarket.value.map((r) => r.tradeDate))
+watch([range, marketSel], () => (openIndex.value = null), { deep: true })
 
 // ---- detail 內改了標籤／備註 ----
 /** detail 開著時只就地更新該列（不重跑，免得翻頁中列表跳動）；關掉後再重跑。 */
@@ -148,7 +157,7 @@ async function save() {
 }
 // ---- 拖曳排序：拖過別的項目時即時讓位（TransitionGroup 做位移動畫），放開才存 ----
 const dragId = ref<string | null>(null)
-let orderBeforeDrag: SavedQueryWithDates[] = []
+let orderBeforeDrag: SavedQueryWithMatches[] = []
 /** 讓位動畫期間（與 .qlist-move 同長）不再換位，免得項目滑過游標下時來回抖動。 */
 const MOVE_MS = 180
 let lockedUntil = 0
@@ -190,8 +199,8 @@ async function removeQuery() {
 }
 
 // ---- 條件編輯 ----
-const KIND_LABEL: Record<ConditionKind, string> = { tag: '標籤', market: '市場' }
-const ADDABLE: ConditionKind[] = ['tag', 'market']
+const KIND_LABEL: Record<ConditionKind, string> = { tag: '標籤' }
+const ADDABLE: ConditionKind[] = ['tag']
 const TAG_MODES: { value: TagMatchMode; label: string }[] = [
   { value: 'all', label: '全部都有' },
   { value: 'any', label: '任一個有' },
@@ -199,9 +208,7 @@ const TAG_MODES: { value: TagMatchMode; label: string }[] = [
 ]
 function addCondition(kind: ConditionKind) {
   if (!draft.value) return
-  const c: QueryCondition =
-    kind === 'tag' ? { kind, mode: 'all', tagIds: [] } : { kind, marketIds: [] }
-  draft.value.conditions.push(c)
+  draft.value.conditions.push({ kind, mode: 'all', tagIds: [] })
 }
 function removeCondition(i: number) {
   draft.value?.conditions.splice(i, 1)
@@ -214,13 +221,10 @@ function toggle(list: string[], id: string) {
 
 /** 檢視模式下的條件摘要（一條一行）。 */
 function describe(c: QueryCondition): string {
-  if (c.kind === 'tag') {
-    const names = c.tagIds.map(tagName).filter((n): n is string => !!n)
-    if (!names.length) return '標籤：不限'
-    const mode = TAG_MODES.find((m) => m.value === c.mode)!.label
-    return `標籤 ${mode}：${names.join('、')}`
-  }
-  return c.marketIds.length ? `市場：${c.marketIds.map(marketName).join('、')}` : '市場：不限'
+  const names = c.tagIds.map(tagName).filter((n): n is string => !!n)
+  if (!names.length) return '標籤：不限'
+  const mode = TAG_MODES.find((m) => m.value === c.mode)!.label
+  return `標籤 ${mode}：${names.join('、')}`
 }
 
 // ---- 結果表格 ----
@@ -292,7 +296,7 @@ function onKey(e: KeyboardEvent) {
             class="w-3.5 h-3.5 shrink-0 text-dimmed opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
           />
           <span class="truncate">{{ q.name }}</span>
-          <span class="ml-auto pr-1 text-xs text-dimmed shrink-0 tabular-nums">{{ countInRange(q.matchDates, range) }} 筆</span>
+          <span class="ml-auto pr-1 text-xs text-dimmed shrink-0 tabular-nums">{{ countInScope(q.matches, range, marketSel) }} 筆</span>
         </div>
       </TransitionGroup>
       <p v-if="loaded && !queries.length && !draft" class="text-sm text-dimmed">
@@ -302,13 +306,10 @@ function onKey(e: KeyboardEvent) {
 
     <!-- 右側 -->
     <div class="flex-1 min-w-0 flex flex-col p-6 gap-4">
-      <QueryRangeBar
-        v-if="loaded"
-        v-model="range"
-        :record-dates="recordDates"
-        :hist-dates="histDates"
-        class="pb-4 border-b border-default"
-      />
+      <div v-if="loaded" class="flex flex-col gap-3 pb-4 border-b border-default">
+        <QueryMarketBar v-model="marketSel" :markets="markets" />
+        <QueryRangeBar v-model="range" :record-dates="recordDates" :hist-dates="histDates" />
+      </div>
 
       <!-- 編輯模式 -->
       <template v-if="draft">
@@ -337,56 +338,37 @@ function onKey(e: KeyboardEvent) {
             }}</span>
 
             <div class="flex-1 min-w-0 flex flex-col gap-2">
-              <template v-if="c.kind === 'tag'">
-                <div class="flex gap-1.5">
-                  <button
-                    v-for="m in TAG_MODES"
-                    :key="m.value"
-                    class="px-2.5 py-1 rounded-md text-xs border transition-colors cursor-pointer"
-                    :class="
-                      c.mode === m.value
-                        ? 'bg-primary/10 text-primary border-primary/40'
-                        : 'border-default text-dimmed hover:bg-elevated/60'
-                    "
-                    @click="c.mode = m.value"
-                  >
-                    {{ m.label }}
-                  </button>
-                </div>
-                <div class="flex flex-wrap gap-1.5">
-                  <button
-                    v-for="t in tags"
-                    :key="t.id"
-                    class="px-2.5 py-1 rounded-full text-sm border transition-colors cursor-pointer"
-                    :class="
-                      c.tagIds.includes(t.id)
-                        ? 'bg-primary text-inverted border-primary'
-                        : 'border-default text-dimmed hover:bg-elevated/60'
-                    "
-                    @click="toggle(c.tagIds, t.id)"
-                  >
-                    {{ t.name }}
-                  </button>
-                  <span v-if="!tags.length" class="text-sm text-dimmed">還沒有任何標籤</span>
-                </div>
-              </template>
-
-              <div v-else class="flex flex-wrap gap-1.5">
+              <div class="flex gap-1.5">
                 <button
-                  v-for="m in markets"
-                  :key="m.id"
+                  v-for="m in TAG_MODES"
+                  :key="m.value"
+                  class="px-2.5 py-1 rounded-md text-xs border transition-colors cursor-pointer"
+                  :class="
+                    c.mode === m.value
+                      ? 'bg-primary/10 text-primary border-primary/40'
+                      : 'border-default text-dimmed hover:bg-elevated/60'
+                  "
+                  @click="c.mode = m.value"
+                >
+                  {{ m.label }}
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="t in tags"
+                  :key="t.id"
                   class="px-2.5 py-1 rounded-full text-sm border transition-colors cursor-pointer"
                   :class="
-                    c.marketIds.includes(m.id)
+                    c.tagIds.includes(t.id)
                       ? 'bg-primary text-inverted border-primary'
                       : 'border-default text-dimmed hover:bg-elevated/60'
                   "
-                  @click="toggle(c.marketIds, m.id)"
+                  @click="toggle(c.tagIds, t.id)"
                 >
-                  {{ m.name }}
+                  {{ t.name }}
                 </button>
+                <span v-if="!tags.length" class="text-sm text-dimmed">還沒有任何標籤</span>
               </div>
-
             </div>
 
             <UButton
@@ -440,10 +422,10 @@ function onKey(e: KeyboardEvent) {
         <div class="flex items-center gap-2 border-t border-default pt-3">
           <span class="text-sm font-semibold">{{ draft ? '預覽' : '結果' }}</span>
           <span class="text-sm text-dimmed">{{ shown.length }} 筆</span>
-          <span v-if="outside" class="text-xs text-dimmed">（時間範圍外另有 {{ outside }} 筆）</span>
+          <span v-if="outside" class="text-xs text-dimmed">（範圍外另有 {{ outside }} 筆）</span>
         </div>
         <p v-if="!shown.length" class="text-dimmed text-sm">
-          {{ results.length ? '時間範圍內沒有符合的記錄' : '沒有符合的記錄' }}
+          {{ results.length ? '範圍內沒有符合的記錄' : '沒有符合的記錄' }}
         </p>
         <div v-else class="min-h-0 overflow-y-auto rounded-lg border border-default">
           <table class="w-full text-sm">

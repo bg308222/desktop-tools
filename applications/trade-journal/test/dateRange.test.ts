@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import {
-  countInRange,
   inRange,
   makeScale,
   rangeToSlider,
@@ -9,17 +8,12 @@ import {
   histogram,
 } from '../app/lib/dateRange'
 
-describe('inRange / countInRange', () => {
+describe('inRange', () => {
   it('含頭尾，null 端不限', () => {
     expect(inRange('2026-10-15', { from: '2026-10-15', to: '2026-10-15' })).toBe(true)
     expect(inRange('2026-10-15', { from: '2026-10-16', to: null })).toBe(false)
     expect(inRange('2026-10-15', { from: null, to: '2026-10-14' })).toBe(false)
     expect(inRange('2026-10-15', { from: null, to: null })).toBe(true)
-  })
-
-  it('重複日期各算一筆', () => {
-    const dates = ['2026-10-01', '2026-10-01', '2026-10-05', '2026-10-09']
-    expect(countInRange(dates, { from: '2026-10-01', to: '2026-10-05' })).toBe(3)
   })
 })
 
