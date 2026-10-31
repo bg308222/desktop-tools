@@ -30,11 +30,13 @@ const parse = (s: string): number | null => {
 }
 const values = computed(() => cells.value.map((c) => parse(c.text)).filter((n): n is number => n != null))
 
-// 外部值（換日期／市場）不同於目前格子時才重設，打字中的半成品（如「-」）不會被洗掉
+// 外部值（換日期／市場）不同於目前格子時才重設，打字中的半成品（如「-」）不會被洗掉；
+// 剛掛載時格子還沒建，外部值即使是 [] 也要建出尾端空格
 watch(
   () => props.modelValue,
   (v) => {
-    if (JSON.stringify(v) !== JSON.stringify(values.value)) cells.value = [...v.map(String), ''].map(cell)
+    if (!cells.value.length || JSON.stringify(v) !== JSON.stringify(values.value))
+      cells.value = [...v.map(String), ''].map(cell)
   },
   { immediate: true },
 )
