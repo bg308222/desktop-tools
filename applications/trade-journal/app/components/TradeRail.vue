@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import { classify, fmtR, sumR, tally } from '../lib/wlt'
-import { WLT_STYLE } from '../lib/wltStyle'
+import { fmtR, sumR } from '../lib/rValue'
 
 /**
  * 逐筆 R 輸入：單列、固定高度的橫向軌道。
  * 尾端永遠有一格空的，一打字右邊就長出下一格（只往右長、高度不變，太多時橫向捲動）；
- * 中間的格子清空後離開就收掉。每格依 WLT 區間上色，右側固定顯示筆數、WLT 與 ΣR。
+ * 中間的格子清空後離開就收掉。右側固定顯示筆數與 ΣR。
  */
 const props = defineProps<{ modelValue: number[]; emptyText?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [number[]] }>()
 
-const rule = useWltRule()
 /** 每格帶固定 id 當 key：中間收掉一格時，焦點不會跳到別格的值上 */
 interface Cell {
   id: number
@@ -126,13 +124,8 @@ onMounted(() => {
 onUnmounted(() => ro?.disconnect())
 watch(() => cells.value.length, () => nextTick(updateOverflow))
 
-const cellClass = (text: string, isTrailing: boolean) => {
-  const n = parse(text)
-  if (n == null) return isTrailing ? 'border-dashed border-accented text-dimmed' : 'border-default'
-  const k = classify(n, rule.value)
-  return [WLT_STYLE[k].soft, WLT_STYLE[k].text]
-}
-const summary = computed(() => tally(values.value, rule.value))
+const cellClass = (text: string, isTrailing: boolean) =>
+  isTrailing && parse(text) == null ? 'border-dashed border-accented text-dimmed' : 'border-default'
 const total = computed(() => sumR(values.value))
 </script>
 
@@ -174,12 +167,7 @@ const total = computed(() => sumR(values.value))
       class="shrink-0 w-[150px] border-l border-default bg-elevated/40 px-3 flex flex-col justify-center text-xs font-mono tabular-nums leading-tight"
     >
       <template v-if="values.length">
-        <span class="flex gap-1.5">
-          <span class="text-dimmed">{{ values.length }} 筆</span>
-          <span :class="WLT_STYLE.W.text">{{ summary.w }}W</span>
-          <span :class="WLT_STYLE.L.text">{{ summary.l }}L</span>
-          <span :class="WLT_STYLE.T.text">{{ summary.t }}T</span>
-        </span>
+        <span class="text-dimmed">{{ values.length }} 筆</span>
         <span class="flex gap-1.5 mt-0.5">
           <span class="text-dimmed">ΣR</span>
           <span class="font-semibold">{{ fmtR(total) }}</span>

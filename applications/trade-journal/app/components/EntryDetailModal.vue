@@ -5,8 +5,7 @@ import type { QueryResultRow } from '../../shared/query'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { stepIndex } from '../lib/viewerNav'
 import { deriveStatus } from '../lib/completeness'
-import { classify, fmtR } from '../lib/wlt'
-import { WLT_STYLE } from '../lib/wltStyle'
+import { fmtR } from '../lib/rValue'
 
 const props = defineProps<{
   results: QueryResultRow[]
@@ -21,7 +20,6 @@ const emit = defineEmits<{
 }>()
 
 const api = useApi()
-const rule = useWltRule()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const KIND_ORDER: ImageKind[] = ['trade', 'raw', 'review']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
@@ -192,8 +190,7 @@ const position = computed(() =>
                   <span
                     v-for="(r, i) in entry[k]"
                     :key="i"
-                    class="px-1.5 rounded border text-xs font-mono tabular-nums"
-                    :class="[WLT_STYLE[classify(r, rule)].soft, WLT_STYLE[classify(r, rule)].text]"
+                    class="px-1.5 rounded border border-default text-xs font-mono tabular-nums"
                     >{{ fmtR(r) }}</span
                   >
                 </div>
