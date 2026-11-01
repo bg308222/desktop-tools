@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import type { EntryStatus, EntryWithPresence, Market } from '../../shared/domain'
-import { deriveStatus, warnings } from '../lib/completeness'
-import { deviation, heatLevel } from '../lib/deviation'
-import { tally } from '../lib/wlt'
+import { deriveStatus } from '../lib/completeness'
 
 const api = useApi()
 const session = useSession()
@@ -16,9 +14,7 @@ const FAR_PAST = '1970-01-01'
 
 const TAG_LABEL: Record<EntryStatus, string> = {
   empty: '待記錄',
-  recorded: '待復盤',
-  reviewed: '已復盤',
-  notrade_reviewed: '空手✓',
+  recorded: '已記錄',
 }
 
 const loaded = ref(false)
@@ -26,7 +22,6 @@ const markets = ref<Market[]>([])
 const curMarket = ref<string | null>(null)
 const entries = ref<Map<string, EntryWithPresence>>(new Map())
 const menuOpen = ref(false)
-const rule = useWltRule()
 
 const marketName = (id: string | null) => markets.value.find((m) => m.id === id)?.name ?? '—'
 const marketOrder = computed(() => markets.value.map((m) => m.id))
@@ -116,34 +111,14 @@ const calItems = computed<CalItem[]>(() => {
 interface CellView {
   status: EntryStatus
   label: string
-  bgClass: string
-  wlt: string
-  devText: string
-  warns: string[]
   title: string
 }
 const NO_IMAGES = { trade: false, raw: false, review: false }
-const NO_TRADES = { actual: [], ideal: [] }
 function cellView(date: string): CellView {
   const e = entries.value.get(date)
-  const images = e?.images ?? NO_IMAGES
-  const status = deriveStatus(e ?? null, images)
-  const warns = warnings(images)
-  const dev = deviation(e ?? NO_TRADES, rule.value)
-  // 待記錄又沒有偏差＝還沒動過的日子：灰框、不顯示偏差；其餘一律依少賺上熱度色
-  const blank = status === 'empty' && !dev.miss && !dev.over
-  const bgClass = blank ? 'cell-empty' : 'h-' + heatLevel(dev.miss)
-  let wlt = ''
-  if (e?.actual.length) {
-    const a = tally(e.actual, rule.value)
-    wlt = `${a.w}W ${a.l}L`
-  } else if (status === 'notrade_reviewed') wlt = '空手'
-  const devText = blank ? '' : `少${dev.miss} · 多${dev.over}`
-  const title =
-    `${dayjs(date).format('M/D')} ${wd(date)}｜${TAG_LABEL[status]}` +
-    (devText ? `｜${devText}` : '') +
-    (warns.length ? `\n⚠ ${warns.join('\n⚠ ')}` : '')
-  return { status, label: TAG_LABEL[status], bgClass, wlt, devText, warns, title }
+  const status = deriveStatus(e ?? null, e?.images ?? NO_IMAGES)
+  const title = `${dayjs(date).format('M/D')} ${wd(date)}｜${TAG_LABEL[status]}`
+  return { status, label: TAG_LABEL[status], title }
 }
 
 // ── 導向記錄頁 ──
@@ -268,25 +243,14 @@ onUnmounted(() => {
                   v-else
                   class="ov-cell"
                   :data-date="d"
-                  :class="[cellView(d).bgClass, { today: d === today }]"
+                  :class="['cell-' + cellView(d).status, { today: d === today }]"
                   :title="cellView(d).title"
                   @click="openRecord(d)"
                 >
                   <div class="ov-top">
                     <span class="ov-dnum">{{ dayjs(d).date() }}</span>
-                    <UIcon
-                      v-if="cellView(d).warns.length"
-                      name="i-lucide-triangle-alert"
-                      class="ov-warn"
-                    />
                     <span class="ov-tag" :class="'t-' + cellView(d).status">{{
                       cellView(d).label
-                    }}</span>
-                  </div>
-                  <div class="ov-btm">
-                    <span class="ov-wlt font-mono">{{ cellView(d).wlt }}</span>
-                    <span v-if="cellView(d).devText" class="ov-dev font-mono">{{
-                      cellView(d).devText
                     }}</span>
                   </div>
                 </button>
@@ -297,22 +261,9 @@ onUnmounted(() => {
 
         <!-- 圖例：固定在底部，不隨捲動消失 -->
         <div class="ov-legend flex items-center gap-x-3 gap-y-1.5 flex-wrap text-[11px] text-dimmed px-3.5 py-2.5 border-t border-default">
-          <span class="ov-tag t-reviewed">已復盤</span>
-          <span class="ov-tag t-recorded">待復盤</span>
-          <span class="ov-tag t-notrade_reviewed">空手✓</span>
+          <span class="ov-tag t-recorded">已記錄</span>
           <span class="ov-tag t-empty">待記錄</span>
-          <span class="flex items-center gap-1 ml-1">
-            <span>背景=少賺熱度</span>
-            <span class="flex">
-              <i class="ov-sc h-0" /><i class="ov-sc h-1" /><i class="ov-sc h-2" /><i
-                class="ov-sc h-3"
-              /><i class="ov-sc h-4" /><i class="ov-sc h-5" />
-            </span>
-            <span>0→5+</span>
-          </span>
-          <span class="ml-auto"
-            ><b class="ov-mk">少</b>=該做沒做 · <b class="ov-ok">多</b>=不該做卻做</span
-          >
+          <span>有任一張圖＝已記錄</span>
         </div>
       </div>
     </div>
@@ -387,28 +338,6 @@ button:not(:disabled) {
   font-size: 16px;
   font-weight: 700;
 }
-/* 資料缺漏提示：用 currentColor，才能疊在任何熱度底色與深色模式上都看得見 */
-.ov-warn {
-  flex: none;
-  margin-right: auto;
-  width: 14px;
-  height: 14px;
-  color: currentColor;
-}
-.ov-btm {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.ov-wlt {
-  font-size: 15px;
-  opacity: 0.92;
-}
-.ov-dev {
-  font-size: 12px;
-  opacity: 0.72;
-}
-
 .cell-empty {
   background: transparent;
   border-style: dashed;
@@ -416,13 +345,10 @@ button:not(:disabled) {
   color: var(--ui-text-dimmed);
 }
 
-/* 偏差熱度底色（待記錄且無偏差的日子除外）：兩主題共用同一組淺色 chip，明確指定文字色確保可讀 */
-.h-0 { background: #f0fdf4; border-color: #dcfce7; color: #14532d; }
-.h-1 { background: #fff7ed; border-color: #fed7aa; color: #7c2d12; }
-.h-2 { background: #ffedd5; border-color: #fdba74; color: #7c2d12; }
-.h-3 { background: #fecaca; border-color: #fca5a5; color: #7f1d1d; }
-.h-4 { background: #f87171; border-color: #ef4444; color: #450a0a; }
-.h-5 { background: #dc2626; border-color: #b91c1c; color: #fff; }
+.cell-recorded {
+  background: var(--ui-bg-elevated);
+  border-color: var(--ui-border-accented);
+}
 
 /* 狀態 tag（小膠囊，帶色，可疊在任何底色上） */
 .ov-tag {
@@ -435,22 +361,7 @@ button:not(:disabled) {
   white-space: nowrap;
 }
 .t-empty { background: #e4e4e7; color: #52525b; }
-.t-recorded { background: #fde68a; color: #78350f; }
-.t-reviewed { background: #bbf7d0; color: #14532d; }
-.t-notrade_reviewed { background: #bfdbfe; color: #1e3a8a; }
-
-/* 少/多 標色 */
-.ov-mk { color: #b91c1c; font-weight: 700; }
-.ov-ok { color: #b45309; }
-
-/* 圖例熱度刻度 */
-.ov-sc {
-  width: 16px;
-  height: 11px;
-  display: inline-block;
-}
-.ov-sc.h-0 { border-radius: 3px 0 0 3px; }
-.ov-sc.h-5 { border-radius: 0 3px 3px 0; }
+.t-recorded { background: #bbf7d0; color: #14532d; }
 
 /* scrollbar：細、半透明、跟主題 */
 .ov-cal {
@@ -470,9 +381,4 @@ button:not(:disabled) {
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-
-/* 暗色：熱度與 tag 兩主題共用淺色 chip（已在上方指定文字色，深色下不覆蓋）；
-   僅面板文字（少/多標色）需要調亮以在深底上維持對比 */
-:global(.dark) .ov-mk { color: #f87171; }
-:global(.dark) .ov-ok { color: #fbbf24; }
 </style>

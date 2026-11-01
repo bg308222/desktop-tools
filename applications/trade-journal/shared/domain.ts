@@ -43,7 +43,7 @@ export interface TagImage {
   sortOrder: number
 }
 
-export type EntryStatus = 'empty' | 'recorded' | 'reviewed' | 'notrade_reviewed'
+export type EntryStatus = 'empty' | 'recorded'
 
 export interface ImagePresence {
   trade: boolean
@@ -51,7 +51,7 @@ export interface ImagePresence {
   review: boolean
 }
 
-/** entry 加上「三種圖是否存在」——供總覽頁一次算狀態與偏差。 */
+/** entry 加上「三種圖是否存在」——供總覽頁一次算狀態。 */
 export interface EntryWithPresence extends Entry {
   images: ImagePresence
 }

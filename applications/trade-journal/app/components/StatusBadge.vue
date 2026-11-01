@@ -5,12 +5,10 @@ const props = defineProps<{ status: EntryStatus }>()
 
 const MAP: Record<
   EntryStatus,
-  { color: 'neutral' | 'warning' | 'success' | 'info'; label: string }
+  { color: 'neutral' | 'success'; label: string }
 > = {
   empty: { color: 'neutral', label: '待記錄' },
-  recorded: { color: 'warning', label: '已記錄（待復盤）' },
-  reviewed: { color: 'success', label: '已復盤' },
-  notrade_reviewed: { color: 'success', label: '空手·已復盤' },
+  recorded: { color: 'success', label: '已記錄' },
 }
 
 const meta = computed(() => MAP[props.status])

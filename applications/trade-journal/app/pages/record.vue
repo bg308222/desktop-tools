@@ -194,7 +194,7 @@ onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 const status = computed(() =>
-  deriveStatus(trades.value, {
+  deriveStatus(entry.value, {
     trade: !!slots.value.trade,
     raw: !!slots.value.raw,
     review: !!slots.value.review,
