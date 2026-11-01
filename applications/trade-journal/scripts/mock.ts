@@ -15,6 +15,7 @@ import { createImageRepo } from '../server/db/repositories/imageRepo'
 import { createTagRepo } from '../server/db/repositories/tagRepo'
 import { createImageStore } from '../server/utils/imageStore'
 import type { ImageKind } from '../shared/domain'
+import type { Trade } from '../shared/trades'
 
 const dataDir = process.env.DATA_DIR || './data'
 
@@ -114,12 +115,34 @@ function reset() {
   fs.rmSync(join(dataDir, 'images'), { recursive: true, force: true })
 }
 
-/** 1～maxTrades 筆 R：約四成虧損（-2～-0.5R）、其餘 0～4R，半格為單位。 */
-function randomTrades(maxTrades: number): number[] {
+const half = (v: number) => Math.round(v * 2) / 2
+
+/** 一筆交易的六個欄位（以初始止損＝1 為基準）：約四成虧損，其餘獲利在 MFE 以內。 */
+function randomTrade(): Trade {
+  const initialTarget = pick([1.5, 2, 2, 3, 4])
+  const mfe = half(rand() * initialTarget * 1.5)
+  return {
+    initialTarget,
+    paStop: half(rand()),
+    paTarget: half(initialTarget * (0.5 + rand())),
+    realized: chance(0.4) ? pick([-1.5, -1.2, -1, -1, -0.5]) : half(rand() * mfe),
+    mfe,
+  }
+}
+
+/**
+ * 1～maxTrades 筆交易。incomplete 時模擬還沒填完：
+ * 約兩成缺 PA 止損／PA 止盈／實際損益（待補），少數缺初始止盈（缺必填）。
+ */
+function randomTrades(maxTrades: number, incomplete = false): Trade[] {
   const total = 1 + Math.floor(rand() * maxTrades)
-  const out: number[] = []
+  const out: Trade[] = []
   for (let i = 0; i < total; i++) {
-    out.push(chance(0.4) ? pick([-2, -1.5, -1.5, -1.2, -1, -0.5]) : Math.round(rand() * 8) / 2)
+    const t = randomTrade()
+    if (incomplete && chance(0.2)) Object.assign(t, { paStop: null, paTarget: null, realized: null })
+    if (incomplete && chance(0.04)) t.initialTarget = null
+    if (chance(0.3)) t.mfe = null
+    out.push(t)
   }
   return out
 }
@@ -202,7 +225,6 @@ function run() {
       // 約 15% 為空手日（實際 0 筆；兩種：沒機會 / 臨時有事）
       if (chance(0.15)) {
         noTradeCount++
-        // 復盤過才看得出是空手（否則就是待記錄）
         putImage(e.id, 'raw', caption)
         putImage(e.id, 'review', caption)
         imageCount += 2
@@ -214,7 +236,7 @@ function run() {
       // 交易圖 + 實際交易（一定有）
       putImage(e.id, 'trade', caption)
       imageCount++
-      entries.setTrades(e.id, 'actual', randomTrades(4))
+      entries.setTrades(e.id, 'actual', randomTrades(4, true))
 
       // 約 7 成完成復盤（原圖 + 復盤圖 + 理想交易）
       if (chance(0.7)) {

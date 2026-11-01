@@ -42,17 +42,28 @@ describe('computeDataStatus', () => {
     expect(computeDataStatus(db, all).hash).toBe(computeDataStatus(db, all).hash)
   })
 
-  it('改實際 / 理想 R、圖片會改變 hash', async () => {
+  it('改實際 / 理想交易、圖片會改變 hash', async () => {
     const { db, entries, images, e1 } = await setup()
     const h0 = computeDataStatus(db, all).hash
-    entries.setTrades(e1.id, 'actual', [1])
+    entries.setTrades(e1.id, 'actual', [{ initialTarget: 2 }])
     const h1 = computeDataStatus(db, all).hash
     expect(h1).not.toBe(h0)
-    entries.setTrades(e1.id, 'ideal', [2.5])
+    entries.setTrades(e1.id, 'actual', [{ initialTarget: 2, realized: -1 }])
     const h2 = computeDataStatus(db, all).hash
     expect(h2).not.toBe(h1)
+    entries.setTrades(e1.id, 'ideal', [{ initialTarget: 2, realized: -1 }])
+    const h3 = computeDataStatus(db, all).hash
+    expect(h3).not.toBe(h2)
     images.remove(e1.id, 'raw')
-    expect(computeDataStatus(db, all).hash).not.toBe(h2)
+    expect(computeDataStatus(db, all).hash).not.toBe(h3)
+  })
+
+  it('同樣的交易重存一次（換了內部 id）不影響 hash', async () => {
+    const { db, entries, e1 } = await setup()
+    entries.setTrades(e1.id, 'actual', [{ initialTarget: 2, paStop: 0.5 }])
+    const h0 = computeDataStatus(db, all).hash
+    entries.setTrades(e1.id, 'actual', [{ initialTarget: 2, paStop: 0.5 }])
+    expect(computeDataStatus(db, all).hash).toBe(h0)
   })
 
   it('只改備註或時間戳不影響 hash', async () => {

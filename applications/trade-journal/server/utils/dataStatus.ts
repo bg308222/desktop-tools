@@ -6,8 +6,6 @@ interface EntryRow {
   id: string
   market_id: string
   trade_date: string
-  actual_r: string | null
-  ideal_r: string | null
 }
 interface ImageRow {
   entry_id: string
@@ -29,7 +27,7 @@ export function computeDataStatus(db: Db, fileExists: (rel: string) => boolean):
 
   const entries = db
     .prepare(
-      `SELECT id, market_id, trade_date, actual_r, ideal_r
+      `SELECT id, market_id, trade_date
        FROM entry ORDER BY market_id, trade_date`,
     )
     .all<EntryRow>()
@@ -44,13 +42,26 @@ export function computeDataStatus(db: Db, fileExists: (rel: string) => boolean):
     imagesByEntry.set(img.entry_id, list)
   }
 
+  // 交易：每筆取 kind 與六個欄位（依 kind, seq 排序），不含 id
+  const trades = db
+    .prepare(
+      `SELECT entry_id, kind, initial_target, pa_stop, pa_target, realized, mfe
+       FROM trade ORDER BY entry_id, kind, seq`,
+    )
+    .all<{ entry_id: string; kind: string } & Record<string, number | null>>()
+  const tradesByEntry = new Map<string, unknown[][]>()
+  for (const t of trades) {
+    const list = tradesByEntry.get(t.entry_id) ?? []
+    list.push([t.kind, t.initial_target, t.pa_stop, t.pa_target, t.realized, t.mfe])
+    tradesByEntry.set(t.entry_id, list)
+  }
+
   const hash = createHash('sha256')
   for (const e of entries) {
     const line = [
       e.market_id,
       e.trade_date,
-      e.actual_r,
-      e.ideal_r,
+      tradesByEntry.get(e.id) ?? [],
       (imagesByEntry.get(e.id) ?? []).map((i) => [i.kind, i.file_path.replace(/\\/g, '/')]),
     ]
     hash.update(JSON.stringify(line) + '\n')

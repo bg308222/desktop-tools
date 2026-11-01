@@ -5,8 +5,6 @@ import type { QueryResultRow } from '../../shared/query'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { stepIndex } from '../lib/viewerNav'
 import { deriveStatus } from '../lib/completeness'
-import { classify, fmtR } from '../lib/wlt'
-import { WLT_STYLE } from '../lib/wltStyle'
 
 const props = defineProps<{
   results: QueryResultRow[]
@@ -21,7 +19,6 @@ const emit = defineEmits<{
 }>()
 
 const api = useApi()
-const rule = useWltRule()
 const EMPTY: SlotPaths = { trade: null, raw: null, review: null }
 const KIND_ORDER: ImageKind[] = ['trade', 'raw', 'review']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
@@ -188,15 +185,7 @@ const position = computed(() =>
                   <span class="text-xs font-medium text-dimmed w-8">{{ k === 'actual' ? '實際' : '理想' }}</span>
                   <TradeSummary :trades="entry[k]" class="text-sm" />
                 </div>
-                <div v-if="entry[k].length" class="flex flex-wrap gap-1 pl-10">
-                  <span
-                    v-for="(r, i) in entry[k]"
-                    :key="i"
-                    class="px-1.5 rounded border text-xs font-mono tabular-nums"
-                    :class="[WLT_STYLE[classify(r, rule)].soft, WLT_STYLE[classify(r, rule)].text]"
-                    >{{ fmtR(r) }}</span
-                  >
-                </div>
+                <TradeTable v-if="entry[k].length" :model-value="entry[k]" readonly />
               </div>
             </div>
 

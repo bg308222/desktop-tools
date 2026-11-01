@@ -1,3 +1,5 @@
+import type { Trade } from './trades'
+
 export interface Market {
   id: string
   name: string
@@ -11,10 +13,10 @@ export interface Entry {
   id: string
   marketId: string
   tradeDate: string // YYYY-MM-DD
-  /** 實際交易的逐筆 R；空陣列＝0 筆（空手） */
-  actual: number[]
-  /** 理想交易（復盤後認為該怎麼做）的逐筆 R */
-  ideal: number[]
+  /** 實際交易（交易當天的判斷）；空陣列＝0 筆 */
+  actual: Trade[]
+  /** 理想交易（復盤時的判斷）；沒實際交易的日子也可以有 */
+  ideal: Trade[]
   noteJson: string | null
   createdAt: string
   updatedAt: string
@@ -43,7 +45,7 @@ export interface TagImage {
   sortOrder: number
 }
 
-export type EntryStatus = 'empty' | 'recorded' | 'reviewed' | 'notrade_reviewed'
+export type EntryStatus = 'empty' | 'recorded'
 
 export interface ImagePresence {
   trade: boolean
@@ -51,7 +53,7 @@ export interface ImagePresence {
   review: boolean
 }
 
-/** entry 加上「三種圖是否存在」——供總覽頁一次算狀態與偏差。 */
+/** entry 加上「三種圖是否存在」——供總覽頁一次算狀態。 */
 export interface EntryWithPresence extends Entry {
   images: ImagePresence
 }

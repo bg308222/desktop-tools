@@ -6,8 +6,8 @@ import Database from 'better-sqlite3'
 import { openDb } from '../server/db/connection'
 import { createEntryRepo } from '../server/db/repositories/entryRepo'
 
-const TABLES = ['market', 'entry', 'image', 'tag', 'entry_tag', 'tag_image', 'saved_query']
-const OLD_ENTRY_COLS = ['actual_w', 'actual_l', 'actual_t', 'ideal_w', 'ideal_l', 'ideal_t', 'would_w', 'would_l', 'would_t', 'no_trade']
+const TABLES = ['market', 'entry', 'trade', 'image', 'tag', 'entry_tag', 'tag_image', 'saved_query']
+const OLD_ENTRY_COLS = ['actual_w', 'actual_l', 'actual_t', 'ideal_w', 'ideal_l', 'ideal_t', 'would_w', 'would_l', 'would_t', 'no_trade', 'actual_r', 'ideal_r']
 
 describe('openDb', () => {
   it('建立全部資料表', async () => {
@@ -46,18 +46,17 @@ describe('openDb', () => {
     db.close()
   })
 
-  it('entry 具備 actual_r / ideal_r，沒有 WLT、空手、would 欄位', async () => {
+  it('entry 沒有 WLT、空手、would、逐筆 R 欄位', async () => {
     const db = await openDb(':memory:')
     const cols = db
       .prepare(`SELECT name FROM pragma_table_info('entry')`)
       .all<{ name: string }>()
       .map((r) => r.name)
-    expect(cols).toEqual(expect.arrayContaining(['actual_r', 'ideal_r']))
     for (const c of OLD_ENTRY_COLS) expect(cols).not.toContain(c)
     db.close()
   })
 
-  it('舊 DB 的 WLT／空手／would 欄位會被移除，其餘資料保留且可讀寫 R', async () => {
+  it('舊 DB 的 WLT／空手／would／逐筆 R 欄位會被移除，其餘資料保留且可讀寫交易', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tj-old-'))
     const file = path.join(dir, 'old.db')
     const raw = new Database(file)
@@ -67,12 +66,12 @@ describe('openDb', () => {
        CREATE TABLE entry (id TEXT PRIMARY KEY, market_id TEXT NOT NULL REFERENCES market(id) ON DELETE CASCADE,
         trade_date TEXT NOT NULL, actual_w INTEGER, actual_l INTEGER, actual_t INTEGER,
         ideal_w INTEGER, ideal_l INTEGER, ideal_t INTEGER, would_w INTEGER, would_l INTEGER, would_t INTEGER,
-        no_trade INTEGER NOT NULL DEFAULT 0, note_json TEXT,
+        no_trade INTEGER NOT NULL DEFAULT 0, actual_r TEXT, ideal_r TEXT, note_json TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         UNIQUE (market_id, trade_date));
        INSERT INTO market (id, name) VALUES ('m1', 'NQ');
-       INSERT INTO entry (id, market_id, trade_date, actual_w, no_trade, note_json)
-         VALUES ('e1', 'm1', '2026-07-14', 2, 1, 'hi');`,
+       INSERT INTO entry (id, market_id, trade_date, actual_w, no_trade, actual_r, note_json)
+         VALUES ('e1', 'm1', '2026-07-14', 2, 1, '[1.5]', 'hi');`,
     )
     raw.close()
     const db = await openDb(file)
@@ -83,8 +82,10 @@ describe('openDb', () => {
     for (const c of OLD_ENTRY_COLS) expect(cols).not.toContain(c)
     const entries = createEntryRepo(db)
     expect(entries.getById('e1')).toMatchObject({ noteJson: 'hi', actual: [], ideal: [] })
-    entries.setTrades('e1', 'ideal', [3])
-    expect(entries.getById('e1')!.ideal).toEqual([3])
+    entries.setTrades('e1', 'ideal', [{ initialTarget: 3 }])
+    expect(entries.getById('e1')!.ideal).toEqual([
+      { initialTarget: 3, paStop: null, paTarget: null, realized: null, mfe: null },
+    ])
     db.close()
     fs.rmSync(dir, { recursive: true, force: true })
   })
