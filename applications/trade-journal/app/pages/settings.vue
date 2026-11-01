@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DataStatus, ImageKind, Market } from '../../shared/domain'
+import type { DataStatus, ImageKind, Market } from '#shared/domain'
 
 const api = useApi()
 const toast = useToast()

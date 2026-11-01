@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Market } from '../../shared/domain'
+import type { Market } from '#shared/domain'
 
 /** 市場範圍：多選 chip，空陣列＝全部市場；全選時自動回到「全部」。 */
 const props = defineProps<{ modelValue: string[]; markets: Market[] }>()

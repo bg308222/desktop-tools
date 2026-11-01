@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Tag, TagImage } from '../../shared/domain'
+import type { Tag, TagImage } from '#shared/domain'
 import { fileToDataUrl, imageFileFromDrop, imageFileFromPaste } from '../lib/file'
 
 const api = useApi()

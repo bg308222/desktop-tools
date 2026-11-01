@@ -1,4 +1,4 @@
-import type { QueryMatch } from '../../shared/query'
+import type { QueryMatch } from '#shared/query'
 import { inRange, type DateRange } from './dateRange'
 
 /** 整理外來的市場選取（localStorage）：只留字串、去重。 */

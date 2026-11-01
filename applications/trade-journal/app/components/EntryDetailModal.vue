@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { ImageKind, Tag } from '../../shared/domain'
-import type { QueryResultRow } from '../../shared/query'
+import type { ImageKind, Tag } from '#shared/domain'
+import type { QueryResultRow } from '#shared/query'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { stepIndex } from '../lib/viewerNav'
 import { deriveStatus } from '../lib/completeness'

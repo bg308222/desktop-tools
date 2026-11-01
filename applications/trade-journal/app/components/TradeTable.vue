@@ -6,7 +6,7 @@ import {
   type FieldDef,
   type Trade,
   type TradeField,
-} from '../../shared/trades'
+} from '#shared/trades'
 import { fieldState, type FieldState } from '../lib/tradeCheck'
 
 /**

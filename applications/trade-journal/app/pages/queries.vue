@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { Market, Tag } from '../../shared/domain'
+import type { Market, Tag } from '#shared/domain'
 import type {
   ConditionKind,
   QueryCondition,
   QueryResultRow,
   SavedQueryWithMatches,
   TagMatchMode,
-} from '../../shared/query'
+} from '#shared/query'
 import { inRange } from '../lib/dateRange'
 import { countInScope, inMarkets } from '../lib/queryScope'
 

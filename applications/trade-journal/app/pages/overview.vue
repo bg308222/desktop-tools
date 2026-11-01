@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { EntryStatus, EntryWithPresence, Market } from '../../shared/domain'
+import type { EntryStatus, EntryWithPresence, Market } from '#shared/domain'
 import { deriveStatus } from '../lib/completeness'
 import { dayWarning, describeWarning } from '../lib/tradeCheck'
 
