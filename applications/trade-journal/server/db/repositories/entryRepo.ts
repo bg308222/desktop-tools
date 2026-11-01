@@ -1,35 +1,43 @@
 import { randomUUID } from 'node:crypto'
 import type { Db } from '../types'
 import type { Entry, EntryWithPresence } from '../../../shared/domain'
-import { sanitizeTrades, type TradeKind } from '../../../shared/trades'
+import { sanitizeTrades, type Trade, type TradeKind } from '../../../shared/trades'
 
 interface EntryRow {
   id: string
   market_id: string
   trade_date: string
-  actual_r: string | null
-  ideal_r: string | null
   note_json: string | null
   created_at: string
   updated_at: string
 }
 
-/** DB 內的 R 陣列 JSON；null 或壞資料都當 0 筆。 */
-function toTrades(json: string | null): number[] {
-  if (!json) return []
-  try {
-    return sanitizeTrades(JSON.parse(json))
-  } catch {
-    return []
-  }
+interface TradeRow {
+  entry_id: string
+  kind: TradeKind
+  initial_target: number | null
+  pa_stop: number | null
+  pa_target: number | null
+  realized: number | null
+  mfe: number | null
 }
 
-const toEntry = (r: EntryRow): Entry => ({
+type Trades = Record<TradeKind, Trade[]>
+
+const toTrade = (r: TradeRow): Trade => ({
+  initialTarget: r.initial_target,
+  paStop: r.pa_stop,
+  paTarget: r.pa_target,
+  realized: r.realized,
+  mfe: r.mfe,
+})
+
+const toEntry = (r: EntryRow, trades: Trades | undefined): Entry => ({
   id: r.id,
   marketId: r.market_id,
   tradeDate: r.trade_date,
-  actual: toTrades(r.actual_r),
-  ideal: toTrades(r.ideal_r),
+  actual: trades?.actual ?? [],
+  ideal: trades?.ideal ?? [],
   noteJson: r.note_json,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -38,22 +46,50 @@ const toEntry = (r: EntryRow): Entry => ({
 export interface EntryUpsert {
   marketId: string
   tradeDate: string
-  actual?: number[]
-  ideal?: number[]
+  actual?: Trade[]
+  ideal?: Trade[]
   noteJson?: string | null
 }
 
 export function createEntryRepo(db: Db) {
+  /** 一次撈出指定 entry（不給＝全部）的交易，依 entry 分組、各 kind 依 seq 排序。 */
+  const loadTrades = (entryIds?: string[]): Map<string, Trades> => {
+    const rows =
+      entryIds == null
+        ? db.prepare(`SELECT * FROM trade ORDER BY entry_id, kind, seq`).all<TradeRow>()
+        : entryIds.length === 0
+          ? []
+          : db
+              .prepare(
+                `SELECT * FROM trade WHERE entry_id IN (SELECT value FROM json_each(:ids))
+                 ORDER BY entry_id, kind, seq`,
+              )
+              .all<TradeRow>({ ids: JSON.stringify(entryIds) })
+    const out = new Map<string, Trades>()
+    for (const r of rows) {
+      let t = out.get(r.entry_id)
+      if (!t) out.set(r.entry_id, (t = { actual: [], ideal: [] }))
+      t[r.kind].push(toTrade(r))
+    }
+    return out
+  }
+
+  /** entry 列 → Entry（附交易）。 */
+  const withTrades = (rows: EntryRow[], all = false): Entry[] => {
+    const trades = loadTrades(all ? undefined : rows.map((r) => r.id))
+    return rows.map((r) => toEntry(r, trades.get(r.id)))
+  }
+
   const get = (marketId: string, date: string): Entry | null => {
     const r = db
       .prepare(`SELECT * FROM entry WHERE market_id = :m AND trade_date = :d`)
       .get<EntryRow>({ m: marketId, d: date })
-    return r ? toEntry(r) : null
+    return r ? withTrades([r])[0]! : null
   }
 
   const getById = (id: string): Entry | null => {
     const r = db.prepare(`SELECT * FROM entry WHERE id = :id`).get<EntryRow>({ id })
-    return r ? toEntry(r) : null
+    return r ? withTrades([r])[0]! : null
   }
 
   const ensure = (marketId: string, date: string): Entry => {
@@ -68,13 +104,17 @@ export function createEntryRepo(db: Db) {
     return get(marketId, date) as Entry
   }
 
-  /** 覆寫某一組逐筆 R；空陣列存成 NULL。 */
-  const setTrades = (id: string, kind: TradeKind, rs: unknown): void => {
-    const clean = sanitizeTrades(rs)
-    db.prepare(
-      `UPDATE entry SET ${kind === 'actual' ? 'actual_r' : 'ideal_r'} = :v, updated_at = datetime('now') WHERE id = :id`,
-    ).run({ id, v: clean.length ? JSON.stringify(clean) : null })
-  }
+  /** 覆寫某一組交易（實際或理想）：整理後依序重寫，全空的列丟掉。 */
+  const setTrades = (id: string, kind: TradeKind, trades: unknown): void =>
+    db.transaction(() => {
+      db.prepare(`DELETE FROM trade WHERE entry_id = :id AND kind = :kind`).run({ id, kind })
+      const ins = db.prepare(
+        `INSERT INTO trade (id, entry_id, kind, seq, initial_target, pa_stop, pa_target, realized, mfe)
+         VALUES (:tid, :id, :kind, :seq, :initialTarget, :paStop, :paTarget, :realized, :mfe)`,
+      )
+      sanitizeTrades(trades).forEach((t, seq) => ins.run({ tid: randomUUID(), id, kind, seq, ...t }))
+      db.prepare(`UPDATE entry SET updated_at = datetime('now') WHERE id = :id`).run({ id })
+    })
 
   const setNote = (id: string, noteJson: string | null): void => {
     db.prepare(`UPDATE entry SET note_json = :n, updated_at = datetime('now') WHERE id = :id`).run({
@@ -97,8 +137,8 @@ export function createEntryRepo(db: Db) {
     marketId: string,
     from: string,
     to: string,
-  ): EntryWithPresence[] =>
-    db
+  ): EntryWithPresence[] => {
+    const rows = db
       .prepare(
         `SELECT e.*,
            MAX(CASE WHEN i.kind = 'trade'  THEN 1 ELSE 0 END) AS has_trade,
@@ -115,14 +155,16 @@ export function createEntryRepo(db: Db) {
         from,
         to,
       })
-      .map((r) => ({
-        ...toEntry(r),
-        images: { trade: !!r.has_trade, raw: !!r.has_raw, review: !!r.has_review },
-      }))
+    const trades = loadTrades(rows.map((r) => r.id))
+    return rows.map((r) => ({
+      ...toEntry(r, trades.get(r.id)),
+      images: { trade: !!r.has_trade, raw: !!r.has_raw, review: !!r.has_review },
+    }))
+  }
 
   /** 全部 entry（供查詢比對）。 */
   const listAll = (): Entry[] =>
-    db.prepare(`SELECT * FROM entry ORDER BY trade_date`).all<EntryRow>().map(toEntry)
+    withTrades(db.prepare(`SELECT * FROM entry ORDER BY trade_date`).all<EntryRow>(), true)
 
   const remove = (id: string): void => {
     db.prepare(`DELETE FROM entry WHERE id = :id`).run({ id })

@@ -30,11 +30,9 @@ export function openDb(source?: string): Db {
   // migration（冪等）：補上既有 DB 缺少的新欄位、移除已淘汰的欄位
   const cols = (table: string) =>
     new Set((db.pragma(`table_info(${table})`) as { name: string }[]).map((r) => r.name))
+  // 交易改存 trade 表（六個欄位）：舊的 WLT、空手、逐筆 R 欄位直接丟掉（不轉換舊資料）
   const entryCols = cols('entry')
-  for (const c of ['actual_r', 'ideal_r'])
-    if (!entryCols.has(c)) db.exec(`ALTER TABLE entry ADD COLUMN ${c} TEXT`)
-  // WLT 改由 R 推導、空手改由「實際 0 筆」判斷：舊欄位直接丟掉（不轉換舊資料）
-  for (const c of ['actual_w', 'actual_l', 'actual_t', 'ideal_w', 'ideal_l', 'ideal_t', 'would_w', 'would_l', 'would_t', 'no_trade'])
+  for (const c of ['actual_w', 'actual_l', 'actual_t', 'ideal_w', 'ideal_l', 'ideal_t', 'would_w', 'would_l', 'would_t', 'no_trade', 'actual_r', 'ideal_r'])
     if (entryCols.has(c)) db.exec(`ALTER TABLE entry DROP COLUMN ${c}`)
 
   // tag 長出內文欄位

@@ -5,7 +5,6 @@ import type { QueryResultRow } from '../../shared/query'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { stepIndex } from '../lib/viewerNav'
 import { deriveStatus } from '../lib/completeness'
-import { fmtR } from '../lib/rValue'
 
 const props = defineProps<{
   results: QueryResultRow[]
@@ -186,14 +185,7 @@ const position = computed(() =>
                   <span class="text-xs font-medium text-dimmed w-8">{{ k === 'actual' ? '實際' : '理想' }}</span>
                   <TradeSummary :trades="entry[k]" class="text-sm" />
                 </div>
-                <div v-if="entry[k].length" class="flex flex-wrap gap-1 pl-10">
-                  <span
-                    v-for="(r, i) in entry[k]"
-                    :key="i"
-                    class="px-1.5 rounded border border-default text-xs font-mono tabular-nums"
-                    >{{ fmtR(r) }}</span
-                  >
-                </div>
+                <TradeTable v-if="entry[k].length" :model-value="entry[k]" readonly />
               </div>
             </div>
 

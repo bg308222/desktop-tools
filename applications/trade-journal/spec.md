@@ -1,6 +1,6 @@
 # trade-journal 規格
 
-個人交易記錄與復盤工具。以「市場 × 交易日」為單位留存交易圖、復盤圖、逐筆交易的 R 與標籤，
+個人交易記錄與復盤工具。以「市場 × 交易日」為單位留存交易圖、復盤圖、逐筆交易與標籤，
 用總覽月曆與自訂查詢回頭檢視。單人使用、資料存在本機資料夾。
 
 ## 技術
@@ -15,10 +15,26 @@
 |---|---|
 | 市場 | 交易標的（如 NQ、CL），可排序、可退役（archived） |
 | 記錄（entry） | 某市場某交易日的一筆資料，`(market_id, trade_date)` 唯一 |
-| 交易（R） | 每筆交易的賺賠比，可負、可小數（最多兩位）。每筆記錄有兩組：**實際交易**（真的做了什麼）、**理想交易**（復盤後認為該怎麼做）；沒填＝0 筆 |
+| 交易 | 一筆交易的六個欄位（見下節）。每筆記錄有兩份清單：**實際交易**（交易當天依當下判斷填）、**理想交易**（復盤時填，沒實際交易的日子也可以有）；沒填＝0 筆 |
 | 三種圖 | 交易圖（trade）、原圖（raw）、復盤圖（review），每筆記錄每種最多一張 |
 | 標籤 | 自由命名的分類，可附顏色、內文、附圖；一筆記錄可有多個標籤 |
 | 查詢 | 使用者存下的一組條件，用來篩出記錄 |
+
+### 交易的六個欄位
+
+全部是**相對距離**（不記價格），以初始止損＝1（1R）為基準；同一筆交易的欄位使用同一個比例。
+
+| # | 欄位 | 責任 | 填寫時機 | 規則 | 值域 | 未填外觀 |
+|---|---|---|---|---|---|---|
+| 1 | 初始止損 | 信號出現時的預設風險距離 | — | 固定 1，不輸入、不存 | — | — |
+| 2 | 初始止盈 | 信號出現時的預期獲利距離 | 信號出現時 | 必填 | > 0 | 紅（缺必填） |
+| 3 | PA 止損 | 依後續 Price Action 判斷的合理停損距離 | PA 證據出現時 | 預期要填 | ≥ 0 | 黃（待補填） |
+| 4 | PA 止盈 | 依後續 Price Action 判斷的合理止盈距離 | PA 證據出現時 | 預期要填 | ≥ 0 | 黃（待補填） |
+| 5 | 實際損益 | 行情走完後實際實現的損益距離 | 行情走完後 | 預期要填 | 可正負零 | 黃（待補填） |
+| 6 | 最大浮盈（MFE） | 行情走完前市場曾提供的最大有利距離 | 行情走完後 | 選填 | ≥ 0 | 無提醒 |
+
+- 小數最多兩位；違反值域或不是數字的輸入不存（離開格子即清掉）。
+- 缺必填或待補填都照樣存檔，只是外觀提醒；不做任何跨欄位檢查（跨欄位的「不合理」是交易行為，留給之後的偏差分析）。
 
 ### 狀態（由 entry 與圖片推導，不存 DB）
 
@@ -36,10 +52,11 @@
 - **總覽**：單一市場的連續月曆（週一～五），每格顯示日期與狀態；待記錄為灰色虛框，已記錄為實底。
 - **記錄**：選市場（↑↓）與交易日（←→，跳過週末；可用日曆跳），填交易圖＋實際交易、
   原圖＋復盤圖＋理想交易、標籤、備註。
-  - 實際／理想交易各是一列**固定高度的橫向軌道**：每格一筆 R，尾端永遠有一格空的（虛線、提示「+R」），
-    一打字右邊就長出下一格；格子多到放不下時橫向捲動（滾輪可直接橫捲、兩側淡出提示），高度永遠不變。
-    - 右側固定欄顯示「n 筆」與 ΣR，0 筆時實際顯示「0 筆（空手）」。
-    - Enter 跳下一格；空格按 Backspace 回上一格；游標在頭／尾時 ←→ 換格；中間的格子清空（或內容不是數字）離開後收掉。
+  - 實際／理想交易各是一張**交易表**：一筆一列，欄位為 #、初始止損（固定 1）與五個可填欄位，標題顯示「n 筆」。
+    - 表格本體**固定 4 列高**，超過在表內捲動（表頭固定）；不足 4 列以淡格線佔位，頁面高度永遠不變。
+    - 尾端永遠一列空白，在空白列打字就長出下一列；整列清空後離開該列即收掉；列尾 × 刪除該列。
+    - 未填外觀依上表：初始止盈紅、PA 止損／PA 止盈／實際損益黃（虛線淡底），填完恢復；空白列不提醒。
+    - Enter 跳下一格（列尾跳下一列）；Tab／Shift+Tab 前後格；↑↓ 同欄換列；Esc 離開。
     - 停止輸入 500ms 後存檔；換市場／日期、離開頁面前先送出。
   - 圖片欄位只在無圖時接受 **Ctrl/⌘+V 貼上**或拖放；不提供選擇檔案。有圖時點擊放大，要換圖需先移除。
 - **查詢**：見下節。
@@ -86,10 +103,10 @@
 
 - 左欄列出已存查詢與每個查詢在全域範圍內會查到的筆數（「n 筆」），「新增查詢」；直接拖曳項目調整順序
   （拖過其他項目時即時讓位、有位移動畫，放開才存檔；Esc 取消或放到清單外則還原），新增的查詢排在最後。未編輯時 ←→ 循環切換查詢，同一 session 內記住選取。
-- 檢視：查詢名稱、條件摘要、編輯／刪除；下方結果表格，欄位為 **市場、日期、實際、理想、標籤**；實際／理想顯示換算後的 `xW yL zT · ΣR`（hover 看每一筆），0 筆為「—」。
+- 檢視：查詢名稱、條件摘要、編輯／刪除；下方結果表格，欄位為 **市場、日期、實際、理想、標籤**；實際／理想顯示「n 筆」，有缺必填（紅）或待補填（黃）時加 ⚠（hover 看筆數），0 筆為「—」。
 - 編輯／新增：名稱、條件列表（每條可移除）、「＋標籤」加條件；下方結果即時預覽，按儲存才寫入。
   有未儲存變更時切走會先確認。
-- 點結果列開啟 detail：三種圖（1/2/3、Space、點圖放大）、狀態、實際／理想交易（筆數、ΣR 與每一筆 R）、標籤、備註；←→ 在結果間逐筆翻；
+- 點結果列開啟 detail：三種圖（1/2/3、Space、點圖放大）、狀態、實際／理想交易（筆數與唯讀的六欄位表，未填同樣上色）、標籤、備註；←→ 在結果間逐筆翻；
   Esc 或滑鼠中鍵關閉（放大的圖片燈箱開著時，中鍵只關燈箱）。
   - 標籤與備註可直接編輯（操作同記錄頁）：標籤即改即存；備註停止輸入 500ms 後存，換筆或關閉前會先送出。
     焦點在輸入框時快捷鍵讓路。
@@ -99,8 +116,10 @@
 
 ```
 market      (id, name, sort_order, archived, created_at)
-entry       (id, market_id→market, trade_date, actual_r, ideal_r, note_json,
+entry       (id, market_id→market, trade_date, note_json,
              created_at, updated_at)                  UNIQUE(market_id, trade_date)
+trade       (id, entry_id→entry, kind∈{actual,ideal}, seq,
+             initial_target, pa_stop, pa_target, realized, mfe)   INDEX(entry_id, kind, seq)
 image       (id, entry_id→entry, kind∈{trade,raw,review}, file_path, width, height, created_at)
                                                        UNIQUE(entry_id, kind)
 tag         (id, name UNIQUE, color, body, created_at)
@@ -110,9 +129,10 @@ saved_query (id, name, conditions_json, sort_order, created_at)
 ```
 
 - 外鍵皆 `ON DELETE CASCADE`。`note_json` 目前存純文字備註。
-- `actual_r`／`ideal_r`：R 的 JSON 數字陣列（依輸入順序），0 筆存 NULL；寫入時只收有限數字並四捨五入到兩位小數。
-- 開 DB 時套用 schema（`IF NOT EXISTS`），並做 migration：補 `actual_r`／`ideal_r`、`tag.body`、`saved_query.sort_order`；
-  移除已淘汰的 `actual_w/l/t`、`ideal_w/l/t`、`would_w/l/t`、`no_trade` 欄位（**不轉換舊資料**）與 rule 相關表。
+- `trade`：一筆交易一列，`seq` 為清單內順序；五個欄位皆 `REAL`，未填為 NULL（初始止損固定 1，不存）。
+  寫入時整份清單（某 entry 的某 kind）覆寫：逐欄整理（兩位小數、違反值域 → NULL），全空的列丟掉。
+- 開 DB 時套用 schema（`IF NOT EXISTS`），並做 migration：補 `tag.body`、`saved_query.sort_order`；
+  移除已淘汰的 `actual_w/l/t`、`ideal_w/l/t`、`would_w/l/t`、`no_trade`、`actual_r`、`ideal_r` 欄位（**不轉換舊資料**）與 rule 相關表。
 
 ## API
 
@@ -123,8 +143,8 @@ saved_query (id, name, conditions_json, sort_order, created_at)
 | PATCH | `/api/markets/:id` | 改名／退役 `{name?, archived?}` |
 | POST | `/api/markets/reorder` | 排序 `{ids}` |
 | GET | `/api/entries` | `market+date` 取單筆 |
-| PUT | `/api/entries` | upsert `{marketId, tradeDate, actual?: number[], ideal?: number[], noteJson?}` |
-| PATCH | `/api/entries/:id` | `{trades?: {kind: 'actual'\|'ideal', value: number[]}, noteJson?}` |
+| PUT | `/api/entries` | upsert `{marketId, tradeDate, actual?: Trade[], ideal?: Trade[], noteJson?}`；`Trade = {initialTarget, paStop, paTarget, realized, mfe}`（各為 number 或 null） |
+| PATCH | `/api/entries/:id` | `{trades?: {kind: 'actual'\|'ideal', value: Trade[]}, noteJson?}` |
 | GET | `/api/entries/dates` | 所有有記錄的日期 |
 | GET | `/api/overview` | `market+from+to`，附三種圖存在旗標 |
 | GET/POST/DELETE | `/api/images` | 取某筆的圖／貼上 dataURL（記錄圖或標籤附圖）／刪除 |
@@ -150,10 +170,11 @@ saved_query (id, name, conditions_json, sort_order, created_at)
 ## 驗收條件
 
 - 圖片欄位沒有「選擇檔案」按鈕，可以用 Ctrl/⌘+V 貼上圖片。
-- 記錄頁沒有空手開關；實際／理想交易逐筆填 R，連續輸入時格子往右長、頁面高度不變。
+- 記錄頁沒有空手開關；實際／理想交易各是一張六欄位交易表，空白日期也有一列可填；連續新增 6 筆，頁面高度不變、表格內捲動。
+- 初始止盈沒填的列為紅色、PA 止損／PA 止盈／實際損益沒填為黃色，填完恢復；MFE 沒填不提醒；PA 止損填負數離開後被清掉。
 - 沒有 WLT（設定頁沒有 WLT 區間，各頁不顯示 W／L／T）。
 - 總覽只有「待記錄」「已記錄」兩種狀態：沒有圖的日子（即使填了交易）是待記錄；沒有熱度底色、沒有偏差文字。
-- 以含 `actual_w`、`would_*`、`no_trade` 欄位的舊 DB 開啟，舊欄位被移除、其餘資料可正常讀寫。
+- 以含 `actual_w`、`would_*`、`no_trade`、`actual_r` 欄位的舊 DB 開啟，舊欄位被移除、其餘資料可正常讀寫。
 - 側欄沒有「標籤」、「復盤」、「統計」頁，有「查詢」頁（復盤改從查詢的 detail 看）；可以新增、編輯、刪除查詢、調整順序，重整後仍保留。
 - 查詢清單每項右側顯示該查詢在全域範圍內的筆數；切換市場或拖動時間範圍拉桿時，清單筆數、結果與直方圖即時增減。
 - 時間範圍拉到兩端時顯示「最早」／「今天」；重整後市場與時間範圍不變；查詢的條件裡沒有「日期」、「市場」。

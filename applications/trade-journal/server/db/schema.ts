@@ -11,13 +11,25 @@ CREATE TABLE IF NOT EXISTS entry (
   id          TEXT PRIMARY KEY,
   market_id   TEXT NOT NULL REFERENCES market(id) ON DELETE CASCADE,
   trade_date  TEXT NOT NULL,
-  actual_r    TEXT,
-  ideal_r     TEXT,
   note_json   TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (market_id, trade_date)
 );
+
+-- 逐筆交易：六個欄位皆為以初始止損＝1 為基準的相對距離（初始止損固定 1，不存）
+CREATE TABLE IF NOT EXISTS trade (
+  id              TEXT PRIMARY KEY,
+  entry_id        TEXT NOT NULL REFERENCES entry(id) ON DELETE CASCADE,
+  kind            TEXT NOT NULL CHECK (kind IN ('actual','ideal')),
+  seq             INTEGER NOT NULL,
+  initial_target  REAL,
+  pa_stop         REAL,
+  pa_target       REAL,
+  realized        REAL,
+  mfe             REAL
+);
+CREATE INDEX IF NOT EXISTS trade_entry ON trade (entry_id, kind, seq);
 
 CREATE TABLE IF NOT EXISTS image (
   id          TEXT PRIMARY KEY,

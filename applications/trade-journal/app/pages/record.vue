@@ -2,7 +2,7 @@
 import dayjs from 'dayjs'
 import { parseDate, type DateValue } from '@internationalized/date'
 import type { Entry, ImageKind, Market, Tag } from '../../shared/domain'
-import type { TradeKind } from '../../shared/trades'
+import type { Trade, TradeKind } from '../../shared/trades'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
 
@@ -28,8 +28,8 @@ const curDate = ref<string>(session.record.date ?? snapWeekday(dayjs().format('Y
 const entry = ref<Entry | null>(null)
 const slots = ref<SlotPaths>({ ...EMPTY })
 const tagNames = ref<string[]>([])
-/** 畫面上的逐筆 R（即改即顯示，延遲存檔） */
-const trades = ref<Record<TradeKind, number[]>>({ actual: [], ideal: [] })
+/** 畫面上的交易（即改即顯示，延遲存檔） */
+const trades = ref<Record<TradeKind, Trade[]>>({ actual: [], ideal: [] })
 
 onMounted(async () => {
   const ms = await api.markets.list()
@@ -66,7 +66,7 @@ async function reload() {
   }
 }
 watch([curMarket, curDate], () => {
-  flushTrades() // 換頁前先把上一格的 R 存掉（綁定當時的市場／日期）
+  flushTrades() // 換頁前先把上一格的交易存掉（綁定當時的市場／日期）
   void reload()
 })
 
@@ -88,10 +88,10 @@ async function removeImage(kind: ImageKind) {
   slots.value = { ...slots.value, [kind]: null }
 }
 
-// 逐筆 R：停止輸入 500ms 後存；換市場／日期、離開頁面前先送出
-let pendingTrades: { marketId: string; tradeDate: string; kind: TradeKind; value: number[] }[] = []
+// 交易：停止輸入 500ms 後存；換市場／日期、離開頁面前先送出
+let pendingTrades: { marketId: string; tradeDate: string; kind: TradeKind; value: Trade[] }[] = []
 let tradesTimer: ReturnType<typeof setTimeout> | null = null
-function changeTrades(kind: TradeKind, value: number[]) {
+function changeTrades(kind: TradeKind, value: Trade[]) {
   trades.value = { ...trades.value, [kind]: value }
   const at = { marketId: curMarket.value as string, tradeDate: curDate.value }
   pendingTrades = [...pendingTrades.filter((p) => p.kind !== kind), { ...at, kind, value }]
@@ -107,7 +107,7 @@ function flushTrades() {
     void api.entries
       .upsert({ marketId: p.marketId, tradeDate: p.tradeDate, [p.kind]: p.value })
       .then((e) => {
-        // 還停在同一格：記下 entry（第一次填時才建立），畫面上的 R 以本地為準
+        // 還停在同一格：記下 entry（第一次填時才建立），畫面上的交易以本地為準
         if (curMarket.value === p.marketId && curDate.value === p.tradeDate) entry.value = e
       })
   }
@@ -293,10 +293,11 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
               />
             </div>
             <div>
-              <label class="block text-xs uppercase text-dimmed mb-1.5">實際交易（每筆 R，沒有交易＝空手）</label>
-              <TradeRail
+              <label class="block text-xs uppercase text-dimmed mb-1.5">
+                實際交易（交易當天的判斷）· {{ trades.actual.length }} 筆
+              </label>
+              <TradeTable
                 :model-value="trades.actual"
-                empty-text="0 筆（空手）"
                 @update:model-value="(v) => changeTrades('actual', v)"
               />
             </div>
@@ -323,8 +324,10 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
               />
             </div>
             <div>
-              <label class="block text-xs uppercase text-dimmed mb-1.5">理想交易（復盤後認為該做的每筆 R）</label>
-              <TradeRail
+              <label class="block text-xs uppercase text-dimmed mb-1.5">
+                理想交易（復盤時的判斷）· {{ trades.ideal.length }} 筆
+              </label>
+              <TradeTable
                 :model-value="trades.ideal"
                 @update:model-value="(v) => changeTrades('ideal', v)"
               />

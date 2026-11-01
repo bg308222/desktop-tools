@@ -14,13 +14,13 @@ import type {
   SavedQuery,
   SavedQueryWithMatches,
 } from '../../shared/query'
-import type { TradeKind } from '../../shared/trades'
+import type { Trade, TradeKind } from '../../shared/trades'
 
 export interface EntryUpsertInput {
   marketId: string
   tradeDate: string
-  actual?: number[]
-  ideal?: number[]
+  actual?: Trade[]
+  ideal?: Trade[]
   noteJson?: string | null
 }
 
@@ -62,7 +62,7 @@ export function useApi() {
         call(() => $fetch<Entry | null>('/api/entries', { query: { market: marketId, date } })),
       upsert: (input: EntryUpsertInput) =>
         call(() => $fetch<Entry>('/api/entries', { method: 'PUT', body: input })),
-      setTrades: (id: string, kind: TradeKind, value: number[]) =>
+      setTrades: (id: string, kind: TradeKind, value: Trade[]) =>
         call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { trades: { kind, value } } })),
       setNote: (id: string, noteJson: string | null) =>
         call(() => $fetch(`/api/entries/${id}`, { method: 'PATCH', body: { noteJson } })),

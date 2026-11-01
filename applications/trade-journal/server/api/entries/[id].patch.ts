@@ -3,7 +3,7 @@ import type { TradeKind } from '../../../shared/trades'
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
   const body = await readBody<{
-    trades?: { kind: TradeKind; value: number[] }
+    trades?: { kind: TradeKind; value: unknown }
     noteJson?: string | null
   }>(event)
   const { entries } = useRepos()
