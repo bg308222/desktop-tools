@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   AB_LINES,
-  clampLevel,
   cloneDrawings,
   createHistory,
   isValidSpan,
@@ -176,7 +175,7 @@ function onMove(e: PointerEvent) {
   const d = find(drag.id)
   if (!d) return
   if (d.tool === 'parallel' && (drag.part === 'a' || drag.part === 'b')) d[drag.part] = p
-  else if (d.tool === 'ratio' && drag.part === 'line') d.ys[drag.idx] = clampLevel(d.ys, drag.idx, p.y)
+  else if (d.tool === 'ratio' && drag.part === 'line') d.ys[drag.idx] = p.y
   drag.moved = true
 }
 
@@ -200,7 +199,7 @@ const lines = (d: Drawing): { x1: number; x2: number; ys: LineView[] } => {
 }
 const labels = (d: Drawing) => {
   if (d.tool !== 'ratio') return []
-  return segmentRatios(d.ys).map((r, i) => ({ y: (d.ys[i]! + d.ys[i + 1]!) / 2, text: r == null ? '—' : r.toFixed(2) }))
+  return segmentRatios(d.ys).map((s) => ({ y: (s.top + s.bottom) / 2, text: s.ratio == null ? '—' : s.ratio.toFixed(2) }))
 }
 const preview = computed(() => {
   if (!placing.value) return null

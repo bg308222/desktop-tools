@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import {
-  clampLevel,
   cloneDrawings,
   createHistory,
   isValidSpan,
@@ -35,21 +34,25 @@ describe('比例量測線', () => {
     expect(r).toMatchObject({ x1: 10, x2: 50, ys: [40, 60, 80, 100, 120, 140] })
   })
 
-  it('拖線不可越過相鄰線（可重合）；最外兩條只限一側', () => {
-    const ys = [40, 60, 80, 100, 120, 140]
-    expect(clampLevel(ys, 2, 50)).toBe(60)
-    expect(clampLevel(ys, 2, 105)).toBe(100)
-    expect(clampLevel(ys, 2, 90)).toBe(90)
-    expect(clampLevel(ys, 0, -500)).toBe(-500)
-    expect(clampLevel(ys, 0, 70)).toBe(60)
-    expect(clampLevel(ys, 5, 999)).toBe(999)
+  it('區間比例＝區間高／a、b 兩線目前的高（a、b 那段恆為 1）', () => {
+    const ratios = (ys: number[]) => segmentRatios(ys).map((s) => s.ratio)
+    expect(ratios([0, 20, 40, 60, 80, 100])).toEqual([1, 1, 1, 1, 1])
+    // 拖動 a、b 線後，基準跟著變
+    expect(ratios([0, 10, 20, 60, 90, 200])).toEqual([0.25, 0.25, 1, 0.75, 2.75])
+    expect(ratios([0, 10, 30, 30, 90, 200])).toEqual([null, null, null, null, null])
   })
 
-  it('區間比例＝區間高／a、b 兩線目前的高（a、b 那段恆為 1）', () => {
-    expect(segmentRatios([0, 20, 40, 60, 80, 100])).toEqual([1, 1, 1, 1, 1])
-    // 拖動 a、b 線後，基準跟著變
-    expect(segmentRatios([0, 10, 20, 60, 90, 200])).toEqual([0.25, 0.25, 1, 0.75, 2.75])
-    expect(segmentRatios([0, 10, 30, 30, 90, 200])).toEqual([null, null, null, null, null])
+  it('線可越過其他線：依目前位置重新分段，基準仍是 a、b 兩線', () => {
+    // 最下面那條（index 5）拉進 a(40)、b(60) 之間的 52
+    expect(segmentRatios([0, 20, 40, 60, 80, 52])).toEqual([
+      { top: 0, bottom: 20, ratio: 1 },
+      { top: 20, bottom: 40, ratio: 1 },
+      { top: 40, bottom: 52, ratio: 0.6 },
+      { top: 52, bottom: 60, ratio: 0.4 },
+      { top: 60, bottom: 80, ratio: 1 },
+    ])
+    // a、b 本身交錯，高仍取絕對值
+    expect(segmentRatios([0, 20, 70, 50, 80, 100]).map((s) => s.ratio)).toEqual([1, 1.5, 1, 0.5, 1])
   })
 })
 

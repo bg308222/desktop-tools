@@ -17,13 +17,13 @@ export interface ParallelDrawing {
   b: Pt
 }
 
-/** 比例量測線：橫向範圍固定，六條線各自只能上下拖、不能越過相鄰線 */
+/** 比例量測線：橫向範圍固定，六條線各自只能上下拖，可越過其他線 */
 export interface RatioDrawing {
   id: number
   tool: 'ratio'
   x1: number
   x2: number
-  /** 由上到下排序的六條線 y */
+  /** 六條線的 y（畫定時由上到下；拖動後可交錯，index 即線的身分） */
   ys: number[]
 }
 
@@ -49,20 +49,27 @@ export function toRatio(id: number, a: Pt, b: Pt): RatioDrawing {
   return { id, tool: 'ratio', ...spanX(a, b), ys }
 }
 
-/** 由上到下排序後，a、b 兩線固定落在中間兩條（index 2、3） */
+/** a、b 兩線的 index（畫定時由上到下排序，兩線落在中間兩條） */
 export const AB_LINES = [2, 3] as const
 
-/** 拖第 i 條線到 y：限制在相鄰兩線之間（不可越過，可重合） */
-export function clampLevel(ys: number[], i: number, y: number): number {
-  const lo = i > 0 ? ys[i - 1]! : -Infinity
-  const hi = i < ys.length - 1 ? ys[i + 1]! : Infinity
-  return Math.min(hi, Math.max(lo, y))
+export interface Segment {
+  top: number
+  bottom: number
+  /** 段高是 a、b 兩線目前高的幾倍；a、b 重合時無法比，為 null */
+  ratio: number | null
 }
 
-/** 各區間（相鄰兩線）高度是 a、b 兩線目前高的幾倍（a、b 那段恆為 1）；a、b 重合時無法比，全為 null */
-export function segmentRatios(ys: number[]): (number | null)[] {
-  const unit = ys[AB_LINES[1]]! - ys[AB_LINES[0]]!
-  return ys.slice(1).map((y, i) => (unit > 0 ? (y - ys[i]!) / unit : null))
+/**
+ * 依目前位置由上到下排序，相鄰兩線為一段，段高除以 a、b 兩線目前的高。
+ * 線可交錯：把其他線拉進 a、b 之間，就能量出相對 a、b（＝1）的距離。
+ */
+export function segmentRatios(ys: number[]): Segment[] {
+  const unit = Math.abs(ys[AB_LINES[1]]! - ys[AB_LINES[0]]!)
+  const sorted = [...ys].sort((p, q) => p - q)
+  return sorted.slice(1).map((bottom, i) => {
+    const top = sorted[i]!
+    return { top, bottom, ratio: unit > 0 ? (bottom - top) / unit : null }
+  })
 }
 
 /** 復原／重做：存整份繪圖的快照 */
