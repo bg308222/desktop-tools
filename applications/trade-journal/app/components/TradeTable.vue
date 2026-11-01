@@ -15,6 +15,7 @@ import { fieldState, type FieldState } from '../lib/tradeCheck'
  *   尾端永遠一列空白，一打字就長出下一列；整列清空後離開即收掉。
  * - readonly：精簡顯示（給 detail 用），沒有空白列與刪除鈕。
  * 未填外觀：初始止盈紅（缺必填）、PA 止損／PA 止盈／實際損益黃（待補填）。
+ * 實際損益為正 → 整列綠框，為負 → 整列紅框。
  */
 const props = defineProps<{ modelValue: Trade[]; readonly?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [Trade[]] }>()
@@ -73,14 +74,18 @@ function onInput(i: number, key: TradeField, text: string) {
   emitIfChanged()
 }
 
-/** 離開格子：不合法或違反值域的內容清掉 */
+/**
+ * 離開格子：
+ * - 不合法或違反值域的內容清掉；合法的補成標準寫法（.85 → 0.85、2. → 2）
+ * - 初始止盈有值而 PA 止盈還空著 → PA 止盈帶入同值
+ */
 function onBlur(i: number, def: FieldDef) {
   const r = rows.value[i]
   if (!r) return
-  if (r.text[def.key].trim() !== '' && parse(def, r.text[def.key]) == null) {
-    r.text[def.key] = ''
-    emitIfChanged()
-  }
+  const v = parse(def, r.text[def.key])
+  r.text[def.key] = v == null ? '' : String(v)
+  if (def.key === 'initialTarget' && v != null && r.text.paTarget.trim() === '') r.text.paTarget = String(v)
+  emitIfChanged()
 }
 
 /** 焦點離開整列：整列空白（且不是尾端那列）就收掉 */
@@ -141,6 +146,12 @@ const STATE_CLASS: Record<FieldState, string> = {
   error: 'border-error bg-error/10',
 }
 
+/** 整列外框：實際損益正 → 綠、負 → 紅 */
+function rowClass(r: Row) {
+  const v = parse(TRADE_FIELDS.find((f) => f.key === 'realized')!, r.text.realized)
+  return v == null || v === 0 ? '' : v > 0 ? 'row-win' : 'row-loss'
+}
+
 const fillers = computed(() => (props.readonly ? 0 : Math.max(0, VISIBLE_ROWS - rows.value.length)))
 const fmt = (v: number | null) => (v == null ? '' : String(v))
 </script>
@@ -156,7 +167,7 @@ const fmt = (v: number | null) => (v == null ? '' : String(v))
       </tr>
     </thead>
     <tbody>
-      <tr v-for="(r, i) in rows" :key="r.id">
+      <tr v-for="(r, i) in rows" :key="r.id" :class="rowClass(r)">
         <td
           v-for="f in TRADE_FIELDS"
           :key="f.key"
@@ -191,6 +202,7 @@ const fmt = (v: number | null) => (v == null ? '' : String(v))
           v-for="(r, i) in rows"
           :key="r.id"
           class="h-10 border-t border-default group"
+          :class="rowClass(r)"
           @focusout="onRowFocusOut(i, $event)"
         >
           <td class="text-center text-xs text-dimmed tabular-nums">{{ i + 1 }}</td>
@@ -233,5 +245,14 @@ const fmt = (v: number | null) => (v == null ? '' : String(v))
 <style scoped>
 .trade-table {
   scrollbar-width: thin;
+}
+/* 整列外框用 outline（不受 border-collapse 影響），往內縮避免被捲動區裁掉 */
+.row-win {
+  outline: 2px solid var(--ui-success);
+  outline-offset: -2px;
+}
+.row-loss {
+  outline: 2px solid var(--ui-error);
+  outline-offset: -2px;
 }
 </style>
