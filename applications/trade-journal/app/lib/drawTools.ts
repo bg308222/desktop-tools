@@ -25,6 +25,8 @@ export interface RatioDrawing {
   x2: number
   /** 由上到下排序的六條線 y */
   ys: number[]
+  /** 基準：畫定當下 a、b 兩線的高（之後拖線不變） */
+  unit: number
 }
 
 export type Drawing = ParallelDrawing | RatioDrawing
@@ -45,7 +47,8 @@ export const parallelLevels = (a: Pt, b: Pt) => PARALLEL_KS.map((k) => a.y + k *
 
 /** a、b 定下後轉成比例量測線（六條線由上到下排序） */
 export function toRatio(id: number, a: Pt, b: Pt): RatioDrawing {
-  return { id, tool: 'ratio', ...spanX(a, b), ys: parallelLevels(a, b).sort((p, q) => p - q) }
+  const ys = parallelLevels(a, b).sort((p, q) => p - q)
+  return { id, tool: 'ratio', ...spanX(a, b), ys, unit: Math.abs(b.y - a.y) }
 }
 
 /** 由上到下排序後，a、b 兩線固定落在中間兩條（index 2、3） */
@@ -58,10 +61,9 @@ export function clampLevel(ys: number[], i: number, y: number): number {
   return Math.min(hi, Math.max(lo, y))
 }
 
-/** 各區間（相鄰兩線）高度佔總高（最上到最下）的百分比；總高為 0 時全 0 */
-export function segmentPercents(ys: number[]): number[] {
-  const total = ys[ys.length - 1]! - ys[0]!
-  return ys.slice(1).map((y, i) => (total > 0 ? ((y - ys[i]!) * 100) / total : 0))
+/** 各區間（相鄰兩線）高度是基準（初始 a、b 兩線高）的幾倍 */
+export function segmentRatios(ys: number[], unit: number): number[] {
+  return ys.slice(1).map((y, i) => (unit > 0 ? (y - ys[i]!) / unit : 0))
 }
 
 /** 復原／重做：存整份繪圖的快照 */
