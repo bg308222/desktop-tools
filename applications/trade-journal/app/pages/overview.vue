@@ -2,6 +2,7 @@
 import dayjs from 'dayjs'
 import type { EntryStatus, EntryWithPresence, Market } from '../../shared/domain'
 import { deriveStatus } from '../lib/completeness'
+import { dayWarning, describeWarning } from '../lib/tradeCheck'
 
 const api = useApi()
 const session = useSession()
@@ -111,14 +112,19 @@ const calItems = computed<CalItem[]>(() => {
 interface CellView {
   status: EntryStatus
   label: string
+  /** 交易欄位警示：error 缺初始止盈（紅）、pending 待補填（黃）；與狀態獨立 */
+  warn: 'error' | 'pending' | null
   title: string
 }
 const NO_IMAGES = { trade: false, raw: false, review: false }
 function cellView(date: string): CellView {
   const e = entries.value.get(date)
   const status = deriveStatus(e ?? null, e?.images ?? NO_IMAGES)
-  const title = `${dayjs(date).format('M/D')} ${wd(date)}｜${TAG_LABEL[status]}`
-  return { status, label: TAG_LABEL[status], title }
+  const w = e ? dayWarning(e) : null
+  const title =
+    `${dayjs(date).format('M/D')} ${wd(date)}｜${TAG_LABEL[status]}` +
+    (w?.level ? `\n⚠ ${describeWarning(w)}` : '')
+  return { status, label: TAG_LABEL[status], warn: w?.level ?? null, title }
 }
 
 // ── 導向記錄頁 ──
@@ -249,6 +255,12 @@ onUnmounted(() => {
                 >
                   <div class="ov-top">
                     <span class="ov-dnum">{{ dayjs(d).date() }}</span>
+                    <UIcon
+                      v-if="cellView(d).warn"
+                      name="i-lucide-triangle-alert"
+                      class="ov-warn"
+                      :class="'w-' + cellView(d).warn"
+                    />
                     <span class="ov-tag" :class="'t-' + cellView(d).status">{{
                       cellView(d).label
                     }}</span>
@@ -264,6 +276,12 @@ onUnmounted(() => {
           <span class="ov-tag t-recorded">已記錄</span>
           <span class="ov-tag t-empty">待記錄</span>
           <span>有任一張圖＝已記錄</span>
+          <span class="flex items-center gap-1 ml-2">
+            <UIcon name="i-lucide-triangle-alert" class="ov-warn w-error" />缺初始止盈
+          </span>
+          <span class="flex items-center gap-1">
+            <UIcon name="i-lucide-triangle-alert" class="ov-warn w-pending" />PA 止損／PA 止盈／實際損益待補填
+          </span>
         </div>
       </div>
     </div>
@@ -338,6 +356,18 @@ button:not(:disabled) {
   font-size: 16px;
   font-weight: 700;
 }
+/* 交易欄位警示（與狀態獨立）；放在日期旁 */
+.ov-warn {
+  flex: none;
+  margin-right: auto;
+  width: 15px;
+  height: 15px;
+}
+.w-error { color: #dc2626; }
+.w-pending { color: #d97706; }
+:global(.dark) .w-error { color: #f87171; }
+:global(.dark) .w-pending { color: #fbbf24; }
+
 .cell-empty {
   background: transparent;
   border-style: dashed;
