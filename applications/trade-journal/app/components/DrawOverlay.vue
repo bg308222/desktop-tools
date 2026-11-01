@@ -15,7 +15,7 @@ import {
 } from '../lib/drawTools'
 
 /**
- * 繪圖模式：任何畫面按 P 進入，在最上層蓋一張透明畫板做量測；Esc 或中鍵退出並清空。
+ * 繪圖模式：任何畫面按 T 進入，在最上層蓋一張透明畫板做量測；Esc 或中鍵退出並清空。
  * 「完全不影響原畫面」：開著時所有鍵盤／滑鼠／滾輪事件都在 window capture 階段攔下，
  * 底下的頁面、燈箱、modal 一個事件都收不到（不會換日、不會關燈箱、不會捲動）；
  * 畫板自己的操作也由這裡分派，不用元素上的事件綁定。
@@ -209,13 +209,13 @@ const preview = computed(() => {
   return { ...spanX(a, b), ys: parallelLevels(a, b), a }
 })
 
-// 進入：任何畫面按 P（輸入框內、帶修飾鍵、輸入法組字中不算）
+// 進入：任何畫面按 T（輸入框內、帶修飾鍵、輸入法組字中不算）
 function isEditable(t: EventTarget | null) {
   const el = t as HTMLElement | null
   return !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
 }
 function onEnterKey(e: KeyboardEvent) {
-  if (active.value || e.code !== 'KeyP' || e.repeat || e.isComposing) return
+  if (active.value || e.code !== 'KeyT' || e.repeat || e.isComposing) return
   if (e.ctrlKey || e.metaKey || e.altKey || isEditable(e.target)) return
   e.preventDefault()
   e.stopImmediatePropagation()
