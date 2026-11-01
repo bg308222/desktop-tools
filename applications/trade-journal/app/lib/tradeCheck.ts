@@ -1,4 +1,4 @@
-import { TRADE_FIELDS, type FieldDef, type Trade, type TradeKind } from '../../shared/trades'
+import { TRADE_FIELDS, type FieldDef, type Trade, type TradeKind } from '#shared/trades'
 
 /** 欄位外觀：ok 正常、pending 待補填（黃）、error 缺必填（紅） */
 export type FieldState = 'ok' | 'pending' | 'error'

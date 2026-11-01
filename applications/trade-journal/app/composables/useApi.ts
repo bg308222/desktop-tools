@@ -7,14 +7,14 @@ import type {
   ImageKind,
   Tag,
   TagImage,
-} from '../../shared/domain'
+} from '#shared/domain'
 import type {
   QueryCondition,
   QueryResultRow,
   SavedQuery,
   SavedQueryWithMatches,
-} from '../../shared/query'
-import type { Trade, TradeKind } from '../../shared/trades'
+} from '#shared/query'
+import type { Trade, TradeKind } from '#shared/trades'
 
 export interface EntryUpsertInput {
   marketId: string

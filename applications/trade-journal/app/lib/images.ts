@@ -1,4 +1,4 @@
-import type { ImageKind, ImagePresence, ImageRec } from '../../shared/domain'
+import type { ImageKind, ImagePresence, ImageRec } from '#shared/domain'
 
 export type SlotPaths = Record<ImageKind, string | null>
 

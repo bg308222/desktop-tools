@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EntryStatus } from '../../shared/domain'
+import type { EntryStatus } from '#shared/domain'
 
 const props = defineProps<{ status: EntryStatus }>()
 

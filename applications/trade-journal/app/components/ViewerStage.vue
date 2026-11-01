@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ImageKind } from '../../shared/domain'
+import type { ImageKind } from '#shared/domain'
 import type { SlotPaths } from '../lib/images'
 
 const props = defineProps<{ images: SlotPaths; singleKind: ImageKind }>()

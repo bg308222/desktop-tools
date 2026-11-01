@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Trade } from '../../shared/trades'
+import type { Trade } from '#shared/trades'
 import { tradeState } from '../lib/tradeCheck'
 
 /** 交易清單的一行摘要：n 筆；有缺必填（紅）或待補填（黃）時加 ⚠。0 筆顯示破折號。 */

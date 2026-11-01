@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import { parseDate, type DateValue } from '@internationalized/date'
-import type { Entry, ImageKind, Market, Tag } from '../../shared/domain'
-import type { Trade, TradeKind } from '../../shared/trades'
+import type { Entry, ImageKind, Market, Tag } from '#shared/domain'
+import type { Trade, TradeKind } from '#shared/trades'
 import { toSlotPaths, type SlotPaths } from '../lib/images'
 import { deriveStatus } from '../lib/completeness'
 

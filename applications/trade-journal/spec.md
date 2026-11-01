@@ -6,6 +6,7 @@
 ## 技術
 
 - Nuxt 4（SSR）+ Nuxt UI 4，server 為 Nitro node-server
+- 前後端共用的型別與邏輯放在 `shared/`；app 端一律用 `#shared/...` 別名引用（相對路徑在 production build 會解析失敗）
 - SQLite（better-sqlite3），檔案 `<DATA_DIR>/journal.db`；圖片存在 `<DATA_DIR>/images/`
 - 環境變數：`DATA_DIR`（預設 `./data`）、`HOME_PAGE`（`overview` | `record`，首頁導向）
 

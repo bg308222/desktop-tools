@@ -1,4 +1,4 @@
-import type { EntryStatus, ImagePresence } from '../../shared/domain'
+import type { EntryStatus, ImagePresence } from '#shared/domain'
 
 /**
  * 狀態只分兩種：有 entry 且至少一張圖 → 已記錄，其餘（沒有 entry、或有 entry 但沒圖）→ 待記錄。
