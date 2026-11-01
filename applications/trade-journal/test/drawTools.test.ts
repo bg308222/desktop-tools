@@ -32,7 +32,7 @@ describe('等距平行線', () => {
 describe('比例量測線', () => {
   it('轉換後由上到下排序，a、b 兩線在中間', () => {
     const r = toRatio(1, { x: 50, y: 100 }, { x: 10, y: 80 })
-    expect(r).toMatchObject({ x1: 10, x2: 50, ys: [40, 60, 80, 100, 120, 140], unit: 20 })
+    expect(r).toMatchObject({ x1: 10, x2: 50, ys: [40, 60, 80, 100, 120, 140] })
   })
 
   it('拖線不可越過相鄰線（可重合）；最外兩條只限一側', () => {
@@ -45,10 +45,11 @@ describe('比例量測線', () => {
     expect(clampLevel(ys, 5, 999)).toBe(999)
   })
 
-  it('區間比例＝區間高／初始 a、b 兩線高', () => {
-    expect(segmentRatios([0, 20, 40, 60, 80, 100], 20)).toEqual([1, 1, 1, 1, 1])
-    expect(segmentRatios([0, 10, 10, 50, 90, 200], 20)).toEqual([0.5, 0, 2, 2, 5.5])
-    expect(segmentRatios([5, 5, 5, 5, 5, 5], 0)).toEqual([0, 0, 0, 0, 0])
+  it('區間比例＝區間高／a、b 兩線目前的高（a、b 那段恆為 1）', () => {
+    expect(segmentRatios([0, 20, 40, 60, 80, 100])).toEqual([1, 1, 1, 1, 1])
+    // 拖動 a、b 線後，基準跟著變
+    expect(segmentRatios([0, 10, 20, 60, 90, 200])).toEqual([0.25, 0.25, 1, 0.75, 2.75])
+    expect(segmentRatios([0, 10, 30, 30, 90, 200])).toEqual([null, null, null, null, null])
   })
 })
 

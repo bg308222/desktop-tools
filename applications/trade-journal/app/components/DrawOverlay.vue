@@ -200,7 +200,7 @@ const lines = (d: Drawing): { x1: number; x2: number; ys: LineView[] } => {
 }
 const labels = (d: Drawing) => {
   if (d.tool !== 'ratio') return []
-  return segmentRatios(d.ys, d.unit).map((r, i) => ({ y: (d.ys[i]! + d.ys[i + 1]!) / 2, text: r.toFixed(2) }))
+  return segmentRatios(d.ys).map((r, i) => ({ y: (d.ys[i]! + d.ys[i + 1]!) / 2, text: r == null ? '—' : r.toFixed(2) }))
 }
 const preview = computed(() => {
   if (!placing.value) return null
