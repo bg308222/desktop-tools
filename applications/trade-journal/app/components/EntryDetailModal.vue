@@ -39,7 +39,6 @@ const tagNames = computed(() =>
     .filter((n): n is string => !!n)
     .sort(),
 )
-const suggestions = computed(() => props.tags.map((t) => t.name))
 
 async function commitTags(names: string[]) {
   const e = entry.value
@@ -193,7 +192,7 @@ const position = computed(() =>
               <p class="text-xs font-medium text-dimmed mb-1.5">標籤</p>
               <TagEditor
                 :model-value="tagNames"
-                :suggestions="suggestions"
+                :known="tags"
                 @update:model-value="commitTags"
               />
             </div>

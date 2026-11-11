@@ -342,7 +342,7 @@ const noteKey = computed(() => entry.value?.id ?? `${curMarket.value}-${curDate.
               <label class="block text-xs uppercase text-dimmed mb-1.5">標籤</label>
               <TagEditor
                 :model-value="tagNames"
-                :suggestions="allTags.map((t) => t.name)"
+                :known="allTags"
                 @update:model-value="commitTags"
               />
             </div>
