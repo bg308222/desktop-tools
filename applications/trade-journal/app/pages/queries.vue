@@ -10,6 +10,7 @@ import type {
 } from '#shared/query'
 import { inRange } from '../lib/dateRange'
 import { countInScope, inMarkets } from '../lib/queryScope'
+import { tagChipStyle } from '../lib/tagColor'
 
 const api = useApi()
 const session = useSession()
@@ -34,6 +35,8 @@ const openIndex = ref<number | null>(null)
 const selected = computed(() => queries.value.find((q) => q.id === selectedId.value) ?? null)
 const marketName = (id: string) => markets.value.find((m) => m.id === id)?.name ?? id
 const tagName = (id: string) => tags.value.find((t) => t.id === id)?.name ?? null
+/** 條件裡已選取的標籤按鈕：有顏色就用實色底，沒有回 null（用 primary）。 */
+const pickedStyle = (t: Tag) => tagChipStyle(t.color, 'solid')
 
 onMounted(async () => {
   loadQueryRange()
@@ -231,9 +234,9 @@ function describe(c: QueryCondition): string {
 const fmtDate = (d: string) => `${dayjs(d).format('YYYY/M/D')} 週${WEEKDAY[dayjs(d).day()]}`
 const rowTags = (r: QueryResultRow) =>
   r.tagIds
-    .map(tagName)
-    .filter((n): n is string => !!n)
-    .sort()
+    .map((id) => tags.value.find((t) => t.id === id))
+    .filter((t): t is Tag => !!t)
+    .sort((a, b) => a.name.localeCompare(b.name))
 
 /** ←/→ 循環切換查詢；編輯中、燈箱開著或焦點在輸入框時讓路。 */
 function onKey(e: KeyboardEvent) {
@@ -356,14 +359,22 @@ function onKey(e: KeyboardEvent) {
                 <button
                   v-for="t in tags"
                   :key="t.id"
-                  class="px-2.5 py-1 rounded-full text-sm border transition-colors cursor-pointer"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border transition-colors cursor-pointer"
                   :class="
                     c.tagIds.includes(t.id)
-                      ? 'bg-primary text-inverted border-primary'
+                      ? pickedStyle(t)
+                        ? ''
+                        : 'bg-primary text-inverted border-primary'
                       : 'border-default text-dimmed hover:bg-elevated/60'
                   "
+                  :style="c.tagIds.includes(t.id) ? (pickedStyle(t) ?? undefined) : undefined"
                   @click="toggle(c.tagIds, t.id)"
                 >
+                  <span
+                    v-if="t.color && !c.tagIds.includes(t.id)"
+                    class="w-2 h-2 rounded-full shrink-0"
+                    :style="{ background: t.color }"
+                  />
                   {{ t.name }}
                 </button>
                 <span v-if="!tags.length" class="text-sm text-dimmed">還沒有任何標籤</span>
@@ -450,9 +461,7 @@ function onKey(e: KeyboardEvent) {
                 <td class="px-3 py-2"><TradeSummary :trades="r.ideal" /></td>
                 <td class="px-3 py-2">
                   <div class="flex flex-wrap gap-1">
-                    <UBadge v-for="n in rowTags(r)" :key="n" color="primary" variant="subtle" size="sm">{{
-                      n
-                    }}</UBadge>
+                    <TagChip v-for="t in rowTags(r)" :key="t.id" :name="t.name" :color="t.color" size="sm" />
                   </div>
                 </td>
               </tr>

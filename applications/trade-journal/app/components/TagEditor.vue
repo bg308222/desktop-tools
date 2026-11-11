@@ -1,9 +1,16 @@
 <script setup lang="ts">
+import type { Tag } from '#shared/domain'
 import { isPickedFromList } from '../lib/tagInput'
 
-/** 標籤編輯：點標籤移除；輸入框從建議清單選取即上，新標籤按 Enter。 */
-const props = defineProps<{ modelValue: string[]; suggestions: string[] }>()
+/**
+ * 標籤編輯：點標籤移除；輸入框從建議清單選取即上，新標籤按 Enter。
+ * `known` 是所有既有標籤：當作建議清單，也用來查每個標籤的顏色。
+ */
+const props = defineProps<{ modelValue: string[]; known: Tag[] }>()
 const emit = defineEmits<{ 'update:modelValue': [string[]] }>()
+
+const suggestions = computed(() => props.known.map((t) => t.name))
+const colorOf = (n: string) => props.known.find((t) => t.name === n)?.color ?? null
 
 const draft = ref('')
 const listId = useId()
@@ -15,7 +22,7 @@ function add() {
 }
 /** 從建議清單選到既有標籤時直接上標，不必再按 Enter。 */
 function onInput(e: Event) {
-  if (isPickedFromList((e as InputEvent).inputType, draft.value, props.suggestions)) add()
+  if (isPickedFromList((e as InputEvent).inputType, draft.value, suggestions.value)) add()
 }
 function remove(n: string) {
   emit(
@@ -27,14 +34,14 @@ function remove(n: string) {
 
 <template>
   <div class="flex flex-wrap gap-2 items-center">
-    <UBadge
+    <TagChip
       v-for="n in modelValue"
       :key="n"
-      color="primary"
-      variant="subtle"
+      :name="n"
+      :color="colorOf(n)"
       class="cursor-pointer"
       @click="remove(n)"
-      >{{ n }} ✕</UBadge
+      >{{ n }} ✕</TagChip
     >
     <input
       v-model="draft"
